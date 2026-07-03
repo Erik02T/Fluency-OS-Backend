@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
-import { KanjiFiltersDto, KanjiListResponseDto, KanjiDetailResponseDto, PaginatedKanjiResponseDto } from './dto';
+import {
+  KanjiFiltersDto,
+  KanjiListResponseDto,
+  KanjiDetailResponseDto,
+  PaginatedKanjiResponseDto,
+} from './dto';
 
 @Injectable()
 export class KanjiService {
@@ -26,12 +31,15 @@ export class KanjiService {
     // Se usuário está logado, injetar progresso
     let progressMap: Map<string, any> = new Map();
     if (userId) {
-      const kanjiIds = kanjis.map(k => k.id);
-      progressMap = await this.userProgressRepository.findByUserAndKanjis(userId, kanjiIds);
+      const kanjiIds = kanjis.map((k) => k.id);
+      progressMap = await this.userProgressRepository.findByUserAndKanjis(
+        userId,
+        kanjiIds,
+      );
     }
 
     // Transformar em DTOs
-    const data = kanjis.map(kanji => this.toListDto(kanji, progressMap));
+    const data = kanjis.map((kanji) => this.toListDto(kanji, progressMap));
 
     return {
       data,
@@ -60,7 +68,10 @@ export class KanjiService {
     // Buscar progresso do usuário
     let progress = null;
     if (userId) {
-      progress = await this.userProgressRepository.findByUserAndKanji(userId, id);
+      progress = await this.userProgressRepository.findByUserAndKanji(
+        userId,
+        id,
+      );
     }
 
     return this.toDetailDto(kanji, progress);
@@ -72,7 +83,10 @@ export class KanjiService {
    * @param userId ID do usuário (opcional)
    * @returns KanjiDetailResponseDto
    */
-  async findByCharacter(character: string, userId?: string): Promise<KanjiDetailResponseDto> {
+  async findByCharacter(
+    character: string,
+    userId?: string,
+  ): Promise<KanjiDetailResponseDto> {
     const kanji = await this.kanjiRepository.findByCharacter(character);
 
     if (!kanji) {
@@ -81,7 +95,10 @@ export class KanjiService {
 
     let progress = null;
     if (userId) {
-      progress = await this.userProgressRepository.findByUserAndKanji(userId, kanji.id);
+      progress = await this.userProgressRepository.findByUserAndKanji(
+        userId,
+        kanji.id,
+      );
     }
 
     return this.toDetailDto(kanji, progress);
@@ -93,16 +110,22 @@ export class KanjiService {
    * @param userId ID do usuário (opcional)
    * @returns Array de KanjiListResponseDto
    */
-  async search(query: string, userId?: string): Promise<KanjiListResponseDto[]> {
+  async search(
+    query: string,
+    userId?: string,
+  ): Promise<KanjiListResponseDto[]> {
     const kanjis = await this.kanjiRepository.search(query);
 
     let progressMap: Map<string, any> = new Map();
     if (userId) {
-      const kanjiIds = kanjis.map(k => k.id);
-      progressMap = await this.userProgressRepository.findByUserAndKanjis(userId, kanjiIds);
+      const kanjiIds = kanjis.map((k) => k.id);
+      progressMap = await this.userProgressRepository.findByUserAndKanjis(
+        userId,
+        kanjiIds,
+      );
     }
 
-    return kanjis.map(kanji => this.toListDto(kanji, progressMap));
+    return kanjis.map((kanji) => this.toListDto(kanji, progressMap));
   }
 
   /**
@@ -120,22 +143,25 @@ export class KanjiService {
    * @param progressMap Map de progresso (userId_kanjiId -> progress)
    * @returns KanjiListResponseDto
    */
-  private toListDto(kanji: any, progressMap: Map<string, any>): KanjiListResponseDto {
+  private toListDto(
+    kanji: any,
+    progressMap: Map<string, any>,
+  ): KanjiListResponseDto {
     const progress = progressMap.get(kanji.id);
 
     // Extrair leituras por tipo
     const onyomi = kanji.readings
-      .filter(r => r.readingType === 'onyomi')
-      .map(r => r.reading);
+      .filter((r) => r.readingType === 'onyomi')
+      .map((r) => r.reading);
 
     const kunyomi = kanji.readings
-      .filter(r => r.readingType === 'kunyomi')
-      .map(r => r.reading);
+      .filter((r) => r.readingType === 'kunyomi')
+      .map((r) => r.reading);
 
     return {
       id: kanji.id,
       character: kanji.character,
-      meanings: kanji.meanings.map(m => m.meaning),
+      meanings: kanji.meanings.map((m) => m.meaning),
       onyomi,
       kunyomi,
       jlpt: kanji.jlptLevel,
@@ -162,24 +188,24 @@ export class KanjiService {
   private toDetailDto(kanji: any, progress?: any): KanjiDetailResponseDto {
     // Agrupar leituras por tipo
     const onyomi = kanji.readings
-      .filter(r => r.readingType === 'onyomi')
-      .map(r => ({
+      .filter((r) => r.readingType === 'onyomi')
+      .map((r) => ({
         reading: r.reading,
         romanization: r.romanization,
         isCommon: r.isCommon,
       }));
 
     const kunyomi = kanji.readings
-      .filter(r => r.readingType === 'kunyomi')
-      .map(r => ({
+      .filter((r) => r.readingType === 'kunyomi')
+      .map((r) => ({
         reading: r.reading,
         romanization: r.romanization,
         isCommon: r.isCommon,
       }));
 
     const nanori = kanji.readings
-      .filter(r => r.readingType === 'nanori')
-      .map(r => ({
+      .filter((r) => r.readingType === 'nanori')
+      .map((r) => ({
         reading: r.reading,
         romanization: r.romanization,
       }));
@@ -192,7 +218,7 @@ export class KanjiService {
       strokes: kanji.strokeCount,
       frequency: kanji.frequencyRank,
       grade: kanji.grade,
-      meanings: kanji.meanings.map(m => ({
+      meanings: kanji.meanings.map((m) => ({
         meaning: m.meaning,
         language: m.language,
         isPrimary: m.isPrimary,
@@ -202,14 +228,14 @@ export class KanjiService {
         kunyomi,
         nanori: nanori.length > 0 ? nanori : undefined,
       },
-      examples: kanji.examples.map(e => ({
+      examples: kanji.examples.map((e) => ({
         word: e.word,
         reading: e.reading,
         meaning: e.meaning,
         jlpt: e.jlptLevel,
         audioUrl: e.audioUrl,
       })),
-      radicals: kanji.radicals.map(kr => ({
+      radicals: kanji.radicals.map((kr) => ({
         character: kr.radical.character,
         name: kr.radical.name,
         meaning: kr.radical.meaning,

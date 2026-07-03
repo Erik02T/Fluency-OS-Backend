@@ -19,8 +19,18 @@ describe('KanjiRepository', () => {
       { meaning: 'sol', language: 'pt-BR', isPrimary: true, position: 0 },
     ],
     readings: [
-      { reading: 'ニチ', readingType: 'onyomi', romanization: 'nichi', isCommon: true },
-      { reading: 'ひ', readingType: 'kunyomi', romanization: 'hi', isCommon: true },
+      {
+        reading: 'ニチ',
+        readingType: 'onyomi',
+        romanization: 'nichi',
+        isCommon: true,
+      },
+      {
+        reading: 'ひ',
+        readingType: 'kunyomi',
+        romanization: 'hi',
+        isCommon: true,
+      },
     ],
     examples: [],
     radicals: [],
@@ -137,9 +147,7 @@ describe('KanjiRepository', () => {
     });
 
     it('should return null if kanji not found', async () => {
-      jest
-        .spyOn(prismaService.kanji, 'findUnique')
-        .mockResolvedValue(null);
+      jest.spyOn(prismaService.kanji, 'findUnique').mockResolvedValue(null);
 
       const result = await repository.findByIdFull('nonexistent');
 
@@ -166,9 +174,7 @@ describe('KanjiRepository', () => {
 
   describe('count', () => {
     it('should return total count of kanjis', async () => {
-      jest
-        .spyOn(prismaService.kanji, 'count')
-        .mockResolvedValue(2136);
+      jest.spyOn(prismaService.kanji, 'count').mockResolvedValue(2136);
 
       const filters: KanjiFiltersDto = {
         page: 1,
@@ -184,9 +190,7 @@ describe('KanjiRepository', () => {
 
   describe('search', () => {
     it('should search kanjis by term', async () => {
-      jest
-        .spyOn(prismaService, '$queryRaw')
-        .mockResolvedValue([mockKanji]);
+      jest.spyOn(prismaService, '$queryRaw').mockResolvedValue([mockKanji]);
 
       const result = await repository.search('日');
 

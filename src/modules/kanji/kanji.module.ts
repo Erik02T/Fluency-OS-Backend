@@ -12,10 +12,6 @@ import { PrismaService } from '../auth/repositories/prisma.service';
     UserKanjiProgressRepository,
     PrismaService,
   ],
-  exports: [
-    KanjiService,
-    KanjiRepository,
-    UserKanjiProgressRepository,
-  ],
+  exports: [KanjiService, KanjiRepository, UserKanjiProgressRepository],
 })
 export class KanjiModule {}

@@ -11,7 +11,11 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { KanjiService } from './kanji.service';
-import { KanjiFiltersDto, PaginatedKanjiResponseDto, KanjiDetailResponseDto } from './dto';
+import {
+  KanjiFiltersDto,
+  PaginatedKanjiResponseDto,
+  KanjiDetailResponseDto,
+} from './dto';
 
 @ApiTags('Kanji')
 @Controller('kanji')
@@ -21,7 +25,7 @@ export class KanjiController {
   /**
    * GET /kanji
    * Listar kanjis com filtros, paginação e progresso do usuário
-   * 
+   *
    * Query params:
    *   - jlpt: JlptLevel (N5, N4, N3, N2, N1) [optional]
    *   - grade: number (1-9) [optional]
@@ -29,7 +33,7 @@ export class KanjiController {
    *   - page: number (default 1)
    *   - perPage: number (default 20, max 100)
    *   - sort: 'frequency' | 'jlpt' | 'grade' | 'strokes' (default 'frequency')
-   * 
+   *
    * Returns: PaginatedKanjiResponseDto
    */
   @Get()
@@ -40,7 +44,10 @@ export class KanjiController {
     description: 'Lista de kanjis retornada com sucesso',
     type: PaginatedKanjiResponseDto,
   })
-  async list(@Query() filters: KanjiFiltersDto, @Request() req: any): Promise<PaginatedKanjiResponseDto> {
+  async list(
+    @Query() filters: KanjiFiltersDto,
+    @Request() req: any,
+  ): Promise<PaginatedKanjiResponseDto> {
     const userId = req.user?.id;
     return this.kanjiService.findAll(filters, userId);
   }
@@ -48,7 +55,7 @@ export class KanjiController {
   /**
    * GET /kanji/search/:query
    * Buscar kanjis por termo (character, meaning, reading)
-   * 
+   *
    * Returns: Array<KanjiListResponseDto>
    */
   @Get('search/:query')
@@ -66,7 +73,7 @@ export class KanjiController {
   /**
    * GET /kanji/:id
    * Buscar detalhe de um kanji por ID
-   * 
+   *
    * Returns: KanjiDetailResponseDto
    */
   @Get(':id')
@@ -81,7 +88,10 @@ export class KanjiController {
     status: 404,
     description: 'Kanji não encontrado',
   })
-  async findById(@Param('id') id: string, @Request() req: any): Promise<KanjiDetailResponseDto> {
+  async findById(
+    @Param('id') id: string,
+    @Request() req: any,
+  ): Promise<KanjiDetailResponseDto> {
     const userId = req.user?.id;
     return this.kanjiService.findById(id, userId);
   }

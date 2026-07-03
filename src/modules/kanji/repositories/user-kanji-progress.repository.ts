@@ -25,7 +25,10 @@ export class UserKanjiProgressRepository {
    * @param kanjiIds Array de IDs de kanji
    * @returns Map de kanjiId -> progress
    */
-  async findByUserAndKanjis(userId: string, kanjiIds: string[]): Promise<Map<string, any>> {
+  async findByUserAndKanjis(
+    userId: string,
+    kanjiIds: string[],
+  ): Promise<Map<string, any>> {
     const progresses = await this.prisma.userKanjiProgress.findMany({
       where: {
         userId,
@@ -34,7 +37,7 @@ export class UserKanjiProgressRepository {
     });
 
     const map = new Map();
-    progresses.forEach(p => map.set(p.kanjiId, p));
+    progresses.forEach((p) => map.set(p.kanjiId, p));
     return map;
   }
 

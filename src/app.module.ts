@@ -23,8 +23,6 @@ import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Aplicar rate limiting a todas as rotas exceto health check
-    consumer
-      .apply(RateLimitMiddleware)
-      .forRoutes('*');
+    consumer.apply(RateLimitMiddleware).forRoutes('*');
   }
 }

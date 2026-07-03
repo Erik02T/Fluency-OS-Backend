@@ -17,7 +17,7 @@ describe('Auth E2E Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     // Aplicar global pipes
     app.useGlobalPipes(
       new ValidationPipe({

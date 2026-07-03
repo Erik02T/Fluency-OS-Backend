@@ -154,7 +154,10 @@ export class AuthService {
 
     if (storedUserId) {
       // Deletar refresh token específico
-      await this.redisService.invalidateRefreshToken(storedUserId, refreshToken);
+      await this.redisService.invalidateRefreshToken(
+        storedUserId,
+        refreshToken,
+      );
     }
   }
 

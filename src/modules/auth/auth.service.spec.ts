@@ -98,7 +98,9 @@ describe('AuthService', () => {
       jest.spyOn(userRepository, 'findByEmail').mockResolvedValue(null);
       jest.spyOn(userRepository, 'create').mockResolvedValue(mockUser);
       jest.spyOn(jwtService, 'signAsync').mockResolvedValue('access_token_123');
-      jest.spyOn(redisService, 'storeRefreshToken').mockResolvedValue(undefined);
+      jest
+        .spyOn(redisService, 'storeRefreshToken')
+        .mockResolvedValue(undefined);
 
       // Execute
       const result = await service.register(mockCreateUserDto);
@@ -134,7 +136,9 @@ describe('AuthService', () => {
         .mockImplementation(async () => true as never);
       jest.spyOn(userRepository, 'update').mockResolvedValue(mockUser);
       jest.spyOn(jwtService, 'signAsync').mockResolvedValue('access_token_123');
-      jest.spyOn(redisService, 'storeRefreshToken').mockResolvedValue(undefined);
+      jest
+        .spyOn(redisService, 'storeRefreshToken')
+        .mockResolvedValue(undefined);
 
       const result = await service.login(loginDto);
 
@@ -172,15 +176,10 @@ describe('AuthService', () => {
 
   describe('refreshToken', () => {
     it('should refresh token successfully', async () => {
-      const refreshTokenId =
-        '550e8400-e29b-41d4-a716-446655440000';
+      const refreshTokenId = '550e8400-e29b-41d4-a716-446655440000';
 
-      jest
-        .spyOn(redisService, 'get')
-        .mockResolvedValue(mockUser.id);
-      jest
-        .spyOn(userRepository, 'findById')
-        .mockResolvedValue(mockUser);
+      jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
+      jest.spyOn(userRepository, 'findById').mockResolvedValue(mockUser);
       jest.spyOn(jwtService, 'signAsync').mockResolvedValue('new_access_token');
 
       const result = await service.refreshToken(refreshTokenId);
@@ -201,12 +200,9 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('should logout user successfully', async () => {
-      const refreshTokenId =
-        '550e8400-e29b-41d4-a716-446655440000';
+      const refreshTokenId = '550e8400-e29b-41d4-a716-446655440000';
 
-      jest
-        .spyOn(redisService, 'get')
-        .mockResolvedValue(mockUser.id);
+      jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
       jest
         .spyOn(redisService, 'invalidateRefreshToken')
         .mockResolvedValue(undefined);

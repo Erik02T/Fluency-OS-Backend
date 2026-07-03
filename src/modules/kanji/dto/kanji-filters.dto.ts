@@ -1,4 +1,11 @@
-import { IsEnum, IsOptional, IsString, Min, Max, IsBoolean } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  Min,
+  Max,
+  IsBoolean,
+} from 'class-validator';
 import { JLPTLevel } from '@prisma/client';
 import { Type, Transform } from 'class-transformer';
 
