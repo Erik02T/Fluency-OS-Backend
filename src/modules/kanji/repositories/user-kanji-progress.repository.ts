@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../auth/repositories/prisma.service';
+import { UserKanjiProgressEntity } from '../types/kanji.types';
 
 @Injectable()
 export class UserKanjiProgressRepository {
@@ -11,7 +12,10 @@ export class UserKanjiProgressRepository {
    * @param kanjiId ID do kanji
    * @returns Progresso ou null
    */
-  async findByUserAndKanji(userId: string, kanjiId: string): Promise<any> {
+  async findByUserAndKanji(
+    userId: string,
+    kanjiId: string,
+  ): Promise<UserKanjiProgressEntity | null> {
     return this.prisma.userKanjiProgress.findUnique({
       where: {
         userId_kanjiId: { userId, kanjiId },
@@ -28,7 +32,7 @@ export class UserKanjiProgressRepository {
   async findByUserAndKanjis(
     userId: string,
     kanjiIds: string[],
-  ): Promise<Map<string, any>> {
+  ): Promise<Map<string, UserKanjiProgressEntity>> {
     const progresses = await this.prisma.userKanjiProgress.findMany({
       where: {
         userId,
@@ -36,8 +40,8 @@ export class UserKanjiProgressRepository {
       },
     });
 
-    const map = new Map();
-    progresses.forEach((p) => map.set(p.kanjiId, p));
+    const map = new Map<string, UserKanjiProgressEntity>();
+    progresses.forEach((progress) => map.set(progress.kanjiId, progress));
     return map;
   }
 
@@ -61,7 +65,10 @@ export class UserKanjiProgressRepository {
    * @param kanjiId ID do kanji
    * @returns Novo progresso
    */
-  async create(userId: string, kanjiId: string): Promise<any> {
+  async create(
+    userId: string,
+    kanjiId: string,
+  ): Promise<UserKanjiProgressEntity> {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
 

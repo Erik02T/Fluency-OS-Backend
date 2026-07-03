@@ -1,41 +1,68 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { Kanji, KanjiMeaning, KanjiReading } from '@prisma/client';
+import { JLPTLevel, ReadingType } from '@prisma/client';
 import { KanjiRepository } from './kanji.repository';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import { KanjiFiltersDto } from '../dto';
+import type { KanjiListEntity } from '../types/kanji.types';
 
 describe('KanjiRepository', () => {
   let repository: KanjiRepository;
   let prismaService: PrismaService;
 
-  const mockKanji = {
+  const mockKanjiBase: Kanji = {
     id: 'kanji-123',
     character: '日',
     unicodeCodepoint: 'U+65E5',
-    jlptLevel: 'N5',
+    jlptLevel: JLPTLevel.N5,
     grade: 1,
     strokeCount: 4,
-    frequencyRank: 1,
+    frequency: 1,
+    notes: 'Day, sun',
+    romanization: 'nichi',
+    createdAt: new Date(),
+  };
+
+  type KanjiWithRelations = Kanji & {
+    meanings: KanjiMeaning[];
+    readings: KanjiReading[];
+  };
+
+  const mockKanjiWithRelations: KanjiWithRelations = {
+    ...mockKanjiBase,
     meanings: [
-      { meaning: 'sol', language: 'pt-BR', isPrimary: true, position: 0 },
+      {
+        id: 'meaning-1',
+        kanjiId: 'kanji-123',
+        meaning: 'sun',
+        isPrimary: true,
+        language: 'en',
+        position: 0,
+      },
     ],
     readings: [
       {
+        id: 'reading-1',
+        kanjiId: 'kanji-123',
         reading: 'ニチ',
-        readingType: 'onyomi',
-        romanization: 'nichi',
-        isCommon: true,
-      },
-      {
-        reading: 'ひ',
-        readingType: 'kunyomi',
-        romanization: 'hi',
-        isCommon: true,
+        type: ReadingType.ONYOMI,
+        isPrimary: true,
+        romanji: 'nichi',
       },
     ],
-    examples: [],
-    radicals: [],
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  };
+
+  const mockKanjiListEntity: KanjiListEntity = {
+    ...mockKanjiBase,
+    meanings: [{ meaning: 'sun' }],
+    readings: [
+      {
+        reading: 'ニチ',
+        type: ReadingType.ONYOMI,
+        isPrimary: true,
+        romanji: 'nichi',
+      },
+    ],
   };
 
   beforeEach(async () => {
@@ -67,41 +94,37 @@ describe('KanjiRepository', () => {
         perPage: 20,
       };
 
-      jest
+      const findManySpy = jest
         .spyOn(prismaService.kanji, 'findMany')
-        .mockResolvedValue([mockKanji]);
+        .mockResolvedValue([mockKanjiListEntity]);
 
       const result = await repository.findAll(filters);
 
       expect(result).toBeDefined();
       expect(result.length).toBe(1);
-      expect(result[0].character).toBe('日');
-      expect(prismaService.kanji.findMany).toHaveBeenCalled();
+      expect(result[0]?.character).toBe('日');
+      expect(findManySpy).toHaveBeenCalled();
     });
 
     it('should filter by JLPT level', async () => {
       const filters: KanjiFiltersDto = {
         page: 1,
         perPage: 20,
-        jlpt: 'N5',
+        jlpt: JLPTLevel.N5,
       };
 
-      jest
+      const findManySpy = jest
         .spyOn(prismaService.kanji, 'findMany')
-        .mockResolvedValue([mockKanji]);
+        .mockResolvedValue([mockKanjiListEntity]);
 
       await repository.findAll(filters);
 
-      expect(prismaService.kanji.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            AND: expect.arrayContaining([
-              expect.objectContaining({
-                jlptLevel: 'N5',
-              }),
-            ]),
-          }),
-        }),
+      expect(findManySpy).toHaveBeenCalledTimes(1);
+      const callArgs = findManySpy.mock.calls[0]?.[0] as {
+        where: { AND: Array<{ jlptLevel?: JLPTLevel }> };
+      };
+      expect(callArgs.where.AND).toEqual(
+        expect.arrayContaining([{ jlptLevel: JLPTLevel.N5 }]),
       );
     });
 
@@ -112,22 +135,18 @@ describe('KanjiRepository', () => {
         grade: 1,
       };
 
-      jest
+      const findManySpy = jest
         .spyOn(prismaService.kanji, 'findMany')
-        .mockResolvedValue([mockKanji]);
+        .mockResolvedValue([mockKanjiListEntity]);
 
       await repository.findAll(filters);
 
-      expect(prismaService.kanji.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            AND: expect.arrayContaining([
-              expect.objectContaining({
-                grade: 1,
-              }),
-            ]),
-          }),
-        }),
+      expect(findManySpy).toHaveBeenCalledTimes(1);
+      const callArgs = findManySpy.mock.calls[0]?.[0] as {
+        where: { AND: Array<{ grade?: number }> };
+      };
+      expect(callArgs.where.AND).toEqual(
+        expect.arrayContaining([{ grade: 1 }]),
       );
     });
   });
@@ -136,14 +155,14 @@ describe('KanjiRepository', () => {
     it('should return full kanji details', async () => {
       jest
         .spyOn(prismaService.kanji, 'findUnique')
-        .mockResolvedValue(mockKanji);
+        .mockResolvedValue(mockKanjiWithRelations);
 
       const result = await repository.findByIdFull('kanji-123');
 
       expect(result).toBeDefined();
-      expect(result.character).toBe('日');
-      expect(result.meanings).toBeDefined();
-      expect(result.readings).toBeDefined();
+      expect(result?.character).toBe('日');
+      expect(result?.meanings).toBeDefined();
+      expect(result?.readings).toBeDefined();
     });
 
     it('should return null if kanji not found', async () => {
@@ -157,24 +176,27 @@ describe('KanjiRepository', () => {
 
   describe('findByCharacter', () => {
     it('should find kanji by character', async () => {
-      jest
+      const findUniqueSpy = jest
         .spyOn(prismaService.kanji, 'findUnique')
-        .mockResolvedValue(mockKanji);
+        .mockResolvedValue(mockKanjiWithRelations);
 
       const result = await repository.findByCharacter('日');
 
       expect(result).toBeDefined();
-      expect(result.character).toBe('日');
-      expect(prismaService.kanji.findUnique).toHaveBeenCalledWith({
-        where: { character: '日' },
-        include: expect.anything(),
-      });
+      expect(result?.character).toBe('日');
+      expect(findUniqueSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { character: '日' },
+        }),
+      );
     });
   });
 
   describe('count', () => {
     it('should return total count of kanjis', async () => {
-      jest.spyOn(prismaService.kanji, 'count').mockResolvedValue(2136);
+      const countSpy = jest
+        .spyOn(prismaService.kanji, 'count')
+        .mockResolvedValue(2136);
 
       const filters: KanjiFiltersDto = {
         page: 1,
@@ -184,13 +206,13 @@ describe('KanjiRepository', () => {
       const result = await repository.count(filters);
 
       expect(result).toBe(2136);
-      expect(prismaService.kanji.count).toHaveBeenCalled();
+      expect(countSpy).toHaveBeenCalled();
     });
   });
 
   describe('search', () => {
     it('should search kanjis by term', async () => {
-      jest.spyOn(prismaService, '$queryRaw').mockResolvedValue([mockKanji]);
+      jest.spyOn(prismaService, '$queryRaw').mockResolvedValue([mockKanjiBase]);
 
       const result = await repository.search('日');
 

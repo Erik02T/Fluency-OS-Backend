@@ -70,13 +70,14 @@ export class UserRepository {
     id: string,
     data: Partial<{
       lastLoginAt: Date;
-      name: string;
+      displayName: string;
       avatarUrl: string;
     }>,
   ): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data: {
+        ...data,
         lastActiveAt: new Date(),
       },
     });
@@ -87,8 +88,9 @@ export class UserRepository {
    * @param user Usuário completo
    * @returns Usuário sem passwordHash
    */
-  sanitizeUser(user: User) {
-    const { passwordHash, ...sanitized } = user;
+  sanitizeUser(user: User): Omit<User, 'passwordHash'> {
+    const sanitized = { ...user };
+    delete (sanitized as Partial<User>).passwordHash;
     return sanitized;
   }
 }

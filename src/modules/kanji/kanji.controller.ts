@@ -3,18 +3,18 @@ import {
   Get,
   Param,
   Query,
-  UseGuards,
   Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
 import { KanjiService } from './kanji.service';
 import {
   KanjiFiltersDto,
   PaginatedKanjiResponseDto,
   KanjiDetailResponseDto,
+  KanjiListResponseDto,
 } from './dto';
 
 @ApiTags('Kanji')
@@ -25,16 +25,6 @@ export class KanjiController {
   /**
    * GET /kanji
    * Listar kanjis com filtros, paginação e progresso do usuário
-   *
-   * Query params:
-   *   - jlpt: JlptLevel (N5, N4, N3, N2, N1) [optional]
-   *   - grade: number (1-9) [optional]
-   *   - search: string [optional]
-   *   - page: number (default 1)
-   *   - perPage: number (default 20, max 100)
-   *   - sort: 'frequency' | 'jlpt' | 'grade' | 'strokes' (default 'frequency')
-   *
-   * Returns: PaginatedKanjiResponseDto
    */
   @Get()
   @HttpCode(HttpStatus.OK)
@@ -46,7 +36,7 @@ export class KanjiController {
   })
   async list(
     @Query() filters: KanjiFiltersDto,
-    @Request() req: any,
+    @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<PaginatedKanjiResponseDto> {
     const userId = req.user?.id;
     return this.kanjiService.findAll(filters, userId);
@@ -55,8 +45,6 @@ export class KanjiController {
   /**
    * GET /kanji/search/:query
    * Buscar kanjis por termo (character, meaning, reading)
-   *
-   * Returns: Array<KanjiListResponseDto>
    */
   @Get('search/:query')
   @HttpCode(HttpStatus.OK)
@@ -65,7 +53,10 @@ export class KanjiController {
     status: 200,
     description: 'Resultados de busca retornados',
   })
-  async search(@Param('query') query: string, @Request() req: any) {
+  async search(
+    @Param('query') query: string,
+    @Request() req: AuthRequest.AuthenticatedRequest,
+  ): Promise<KanjiListResponseDto[]> {
     const userId = req.user?.id;
     return this.kanjiService.search(query, userId);
   }
@@ -73,8 +64,6 @@ export class KanjiController {
   /**
    * GET /kanji/:id
    * Buscar detalhe de um kanji por ID
-   *
-   * Returns: KanjiDetailResponseDto
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
@@ -90,7 +79,7 @@ export class KanjiController {
   })
   async findById(
     @Param('id') id: string,
-    @Request() req: any,
+    @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<KanjiDetailResponseDto> {
     const userId = req.user?.id;
     return this.kanjiService.findById(id, userId);
