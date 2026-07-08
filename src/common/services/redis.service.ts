@@ -120,6 +120,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Encontrar o userId associado a um refresh token
+   * @param tokenId ID do refresh token
+   * @returns userId ou null se o token não existir
+   */
+  async findUserIdByRefreshToken(tokenId: string): Promise<string | null> {
+    const pattern = `refresh_token:*:${tokenId}`;
+
+    try {
+      const keys = await this.client.keys(pattern);
+      if (keys.length === 0) {
+        return null;
+      }
+
+      return await this.client.get(keys[0]);
+    } catch (error) {
+      this.logger.error(
+        `Failed to find user by refresh token: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Invalidar todos os refresh tokens do usuário (logout em todos os dispositivos)
    * @param userId ID do usuário
    */
