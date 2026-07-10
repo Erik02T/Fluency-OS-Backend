@@ -4,9 +4,74 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+interface AuthUserBody {
+  email: string;
+}
+
+interface AuthTokensBody {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUserBody;
+}
+
+interface RefreshTokenBody {
+  accessToken: string;
+}
+
+interface ValidationErrorBody {
+  message: string | string[];
+}
+
+interface KanjiListBody {
+  data: unknown[];
+  pagination: Record<string, unknown>;
+}
+
+function parseAuthTokensBody(body: unknown): AuthTokensBody {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('accessToken' in body) ||
+    !('refreshToken' in body) ||
+    !('user' in body)
+  ) {
+    throw new Error('Invalid auth tokens response body');
+  }
+
+  return body as AuthTokensBody;
+}
+
+function parseRefreshTokenBody(body: unknown): RefreshTokenBody {
+  if (typeof body !== 'object' || body === null || !('accessToken' in body)) {
+    throw new Error('Invalid refresh token response body');
+  }
+
+  return body as RefreshTokenBody;
+}
+
+function parseValidationErrorBody(body: unknown): ValidationErrorBody {
+  if (typeof body !== 'object' || body === null || !('message' in body)) {
+    throw new Error('Invalid validation error response body');
+  }
+
+  return body as ValidationErrorBody;
+}
+
+function parseKanjiListBody(body: unknown): KanjiListBody {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('data' in body) ||
+    !('pagination' in body)
+  ) {
+    throw new Error('Invalid kanji list response body');
+  }
+
+  return body as KanjiListBody;
+}
+
 describe('Auth E2E Tests', () => {
   let app: INestApplication<App>;
-  let authToken: string;
   let refreshToken: string;
   const testEmail = `test-${Date.now()}@example.com`;
   const testPassword = 'SecurePass123';
@@ -18,7 +83,6 @@ describe('Auth E2E Tests', () => {
 
     app = moduleFixture.createNestApplication();
 
-    // Aplicar global pipes
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -45,13 +109,13 @@ describe('Auth E2E Tests', () => {
         })
         .expect(201);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body).toHaveProperty('refreshToken');
-      expect(response.body).toHaveProperty('user');
-      expect(response.body.user.email).toBe(testEmail);
+      const body = parseAuthTokensBody(response.body);
 
-      authToken = response.body.accessToken;
-      refreshToken = response.body.refreshToken;
+      expect(body.accessToken).toBeDefined();
+      expect(body.refreshToken).toBeDefined();
+      expect(body.user.email).toBe(testEmail);
+
+      refreshToken = body.refreshToken;
     });
 
     it('should reject duplicate email', async () => {
@@ -75,7 +139,8 @@ describe('Auth E2E Tests', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toBeDefined();
+      const body = parseValidationErrorBody(response.body);
+      expect(body.message).toBeDefined();
     });
   });
 
@@ -89,9 +154,11 @@ describe('Auth E2E Tests', () => {
         })
         .expect(200);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body).toHaveProperty('refreshToken');
-      expect(response.body.user.email).toBe(testEmail);
+      const body = parseAuthTokensBody(response.body);
+
+      expect(body.accessToken).toBeDefined();
+      expect(body.refreshToken).toBeDefined();
+      expect(body.user.email).toBe(testEmail);
     });
 
     it('should reject invalid credentials', async () => {
@@ -124,8 +191,8 @@ describe('Auth E2E Tests', () => {
         })
         .expect(200);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body.accessToken).toBeTruthy();
+      const body = parseRefreshTokenBody(response.body);
+      expect(body.accessToken).toBeTruthy();
     });
 
     it('should reject invalid refresh token', async () => {
@@ -181,9 +248,11 @@ describe('Kanji E2E Tests', () => {
         .query({ page: 1, perPage: 20 })
         .expect(200);
 
-      expect(response.body).toHaveProperty('data');
-      expect(response.body).toHaveProperty('pagination');
-      expect(Array.isArray(response.body.data)).toBe(true);
+      const body = parseKanjiListBody(response.body);
+
+      expect(body.data).toBeDefined();
+      expect(body.pagination).toBeDefined();
+      expect(Array.isArray(body.data)).toBe(true);
     });
 
     it('should filter kanjis by JLPT level', async () => {
@@ -192,7 +261,8 @@ describe('Kanji E2E Tests', () => {
         .query({ jlpt: 'N5', page: 1, perPage: 20 })
         .expect(200);
 
-      expect(response.body.data).toBeDefined();
+      const body = parseKanjiListBody(response.body);
+      expect(body.data).toBeDefined();
     });
   });
 

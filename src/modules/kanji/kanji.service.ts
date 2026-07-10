@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ReadingType } from '@prisma/client';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
 import {
   KanjiFiltersDto,
@@ -6,6 +7,11 @@ import {
   KanjiDetailResponseDto,
   PaginatedKanjiResponseDto,
 } from './dto';
+import {
+  KanjiDetailEntity,
+  KanjiListInput,
+  UserKanjiProgressEntity,
+} from './types/kanji.types';
 
 @Injectable()
 export class KanjiService {
@@ -24,21 +30,18 @@ export class KanjiService {
     filters: KanjiFiltersDto,
     userId?: string,
   ): Promise<PaginatedKanjiResponseDto> {
-    // Buscar kanjis
     const kanjis = await this.kanjiRepository.findAll(filters);
     const total = await this.kanjiRepository.count(filters);
 
-    // Se usuário está logado, injetar progresso
-    let progressMap: Map<string, any> = new Map();
+    let progressMap = new Map<string, UserKanjiProgressEntity>();
     if (userId) {
-      const kanjiIds = kanjis.map((k) => k.id);
+      const kanjiIds = kanjis.map((kanji) => kanji.id);
       progressMap = await this.userProgressRepository.findByUserAndKanjis(
         userId,
         kanjiIds,
       );
     }
 
-    // Transformar em DTOs
     const data = kanjis.map((kanji) => this.toListDto(kanji, progressMap));
 
     return {
@@ -65,8 +68,7 @@ export class KanjiService {
       throw new NotFoundException(`Kanji with id ${id} not found`);
     }
 
-    // Buscar progresso do usuário
-    let progress = null;
+    let progress: UserKanjiProgressEntity | null = null;
     if (userId) {
       progress = await this.userProgressRepository.findByUserAndKanji(
         userId,
@@ -93,7 +95,7 @@ export class KanjiService {
       throw new NotFoundException(`Kanji '${character}' not found`);
     }
 
-    let progress = null;
+    let progress: UserKanjiProgressEntity | null = null;
     if (userId) {
       progress = await this.userProgressRepository.findByUserAndKanji(
         userId,
@@ -116,9 +118,9 @@ export class KanjiService {
   ): Promise<KanjiListResponseDto[]> {
     const kanjis = await this.kanjiRepository.search(query);
 
-    let progressMap: Map<string, any> = new Map();
+    let progressMap = new Map<string, UserKanjiProgressEntity>();
     if (userId) {
-      const kanjiIds = kanjis.map((k) => k.id);
+      const kanjiIds = kanjis.map((kanji) => kanji.id);
       progressMap = await this.userProgressRepository.findByUserAndKanjis(
         userId,
         kanjiIds,
@@ -132,128 +134,118 @@ export class KanjiService {
    * Contar kanjis por nível JLPT
    * @returns Object com contagem por nível
    */
-  async countByJlpt(): Promise<any> {
+  countByJlpt(): Promise<Record<string, number>> {
     // TODO: Implementar quando necessário
-    return {};
+    return Promise.resolve({});
   }
 
-  /**
-   * Transformar Kanji em KanjiListResponseDto
-   * @param kanji Kanji com relations
-   * @param progressMap Map de progresso (userId_kanjiId -> progress)
-   * @returns KanjiListResponseDto
-   */
   private toListDto(
-    kanji: any,
-    progressMap: Map<string, any>,
+    kanji: KanjiListInput,
+    progressMap: Map<string, UserKanjiProgressEntity>,
   ): KanjiListResponseDto {
     const progress = progressMap.get(kanji.id);
+    const readings = 'readings' in kanji ? kanji.readings : [];
+    const meanings = 'meanings' in kanji ? kanji.meanings : [];
 
-    // Extrair leituras por tipo
-    const onyomi = kanji.readings
-      .filter((r) => r.readingType === 'onyomi')
-      .map((r) => r.reading);
+    const onyomi = readings
+      .filter((reading) => reading.type === ReadingType.ONYOMI)
+      .map((reading) => reading.reading);
 
-    const kunyomi = kanji.readings
-      .filter((r) => r.readingType === 'kunyomi')
-      .map((r) => r.reading);
+    const kunyomi = readings
+      .filter((reading) => reading.type === ReadingType.KUNYOMI)
+      .map((reading) => reading.reading);
 
     return {
       id: kanji.id,
       character: kanji.character,
-      meanings: kanji.meanings.map((m) => m.meaning),
+      meanings: meanings.map((meaning) => meaning.meaning),
       onyomi,
       kunyomi,
       jlpt: kanji.jlptLevel,
-      strokes: kanji.strokeCount,
-      frequency: kanji.frequencyRank,
-      grade: kanji.grade,
+      strokes: kanji.strokeCount ?? 0,
+      frequency: kanji.frequency ?? 0,
+      grade: kanji.grade ?? 0,
       userProgress: progress
         ? {
             srsLevel: progress.srsLevel,
             isMastered: progress.isMastered,
-            isFavorited: progress.isFavorited,
+            isFavorited: progress.isFavorite,
             isSuspended: progress.isSuspended,
           }
         : undefined,
     };
   }
 
-  /**
-   * Transformar Kanji em KanjiDetailResponseDto
-   * @param kanji Kanji com relations completas
-   * @param progress UserKanjiProgress (opcional)
-   * @returns KanjiDetailResponseDto
-   */
-  private toDetailDto(kanji: any, progress?: any): KanjiDetailResponseDto {
-    // Agrupar leituras por tipo
+  private toDetailDto(
+    kanji: KanjiDetailEntity,
+    progress?: UserKanjiProgressEntity | null,
+  ): KanjiDetailResponseDto {
     const onyomi = kanji.readings
-      .filter((r) => r.readingType === 'onyomi')
-      .map((r) => ({
-        reading: r.reading,
-        romanization: r.romanization,
-        isCommon: r.isCommon,
+      .filter((reading) => reading.type === ReadingType.ONYOMI)
+      .map((reading) => ({
+        reading: reading.reading,
+        romanization: reading.romanji ?? '',
+        isCommon: reading.isPrimary,
       }));
 
     const kunyomi = kanji.readings
-      .filter((r) => r.readingType === 'kunyomi')
-      .map((r) => ({
-        reading: r.reading,
-        romanization: r.romanization,
-        isCommon: r.isCommon,
+      .filter((reading) => reading.type === ReadingType.KUNYOMI)
+      .map((reading) => ({
+        reading: reading.reading,
+        romanization: reading.romanji ?? '',
+        isCommon: reading.isPrimary,
       }));
 
     const nanori = kanji.readings
-      .filter((r) => r.readingType === 'nanori')
-      .map((r) => ({
-        reading: r.reading,
-        romanization: r.romanization,
+      .filter((reading) => reading.type === ReadingType.NANORI)
+      .map((reading) => ({
+        reading: reading.reading,
+        romanization: reading.romanji ?? '',
       }));
 
     return {
       id: kanji.id,
       character: kanji.character,
-      unicodeCodepoint: kanji.unicodeCodepoint,
+      unicodeCodepoint: kanji.unicodeCodepoint ?? '',
       jlpt: kanji.jlptLevel,
-      strokes: kanji.strokeCount,
-      frequency: kanji.frequencyRank,
-      grade: kanji.grade,
-      meanings: kanji.meanings.map((m) => ({
-        meaning: m.meaning,
-        language: m.language,
-        isPrimary: m.isPrimary,
+      strokes: kanji.strokeCount ?? 0,
+      frequency: kanji.frequency ?? 0,
+      grade: kanji.grade ?? 0,
+      meanings: kanji.meanings.map((meaning) => ({
+        meaning: meaning.meaning,
+        language: meaning.language,
+        isPrimary: meaning.isPrimary,
       })),
       readings: {
         onyomi,
         kunyomi,
         nanori: nanori.length > 0 ? nanori : undefined,
       },
-      examples: kanji.examples.map((e) => ({
-        word: e.word,
-        reading: e.reading,
-        meaning: e.meaning,
-        jlpt: e.jlptLevel,
-        audioUrl: e.audioUrl,
+      examples: kanji.examples.map((example) => ({
+        word: example.word,
+        reading: example.reading,
+        meaning: example.meaning,
+        jlpt: example.jlptLevel ?? kanji.jlptLevel,
       })),
-      radicals: kanji.radicals.map((kr) => ({
-        character: kr.radical.character,
-        name: kr.radical.name,
-        meaning: kr.radical.meaning,
-        isPrimary: kr.isPrimary,
+      radicals: kanji.radicals.map((kanjiRadical) => ({
+        character: kanjiRadical.radical.character,
+        name: kanjiRadical.radical.name,
+        meaning: kanjiRadical.radical.meaning,
+        isPrimary: kanjiRadical.isPrimary,
       })),
       userProgress: progress
         ? {
             srsLevel: progress.srsLevel,
             isMastered: progress.isMastered,
-            isFavorited: progress.isFavorited,
+            isFavorited: progress.isFavorite,
             isSuspended: progress.isSuspended,
-            easeFactor: parseFloat(progress.easeFactor),
+            easeFactor: progress.easeFactor,
             intervalDays: progress.intervalDays,
             nextReviewAt: progress.nextReviewAt,
-            lastReviewedAt: progress.lastReviewedAt,
+            lastReviewedAt: progress.lastReviewAt ?? undefined,
             totalReviews: progress.totalReviews,
             correctReviews: progress.correctReviews,
-            streak: progress.streakDays,
+            streak: 0,
           }
         : undefined,
     };

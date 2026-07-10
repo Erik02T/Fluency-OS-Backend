@@ -1,14 +1,12 @@
 import {
   Injectable,
-  BadRequestException,
   ConflictException,
   UnauthorizedException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { CreateUserDto, LoginDto, AuthResponseDto } from './dto';
 import { UserRepository } from './repositories/user.repository';
 import { RedisService } from '../../common/services/redis.service';
@@ -36,7 +34,7 @@ export class AuthService {
     }
 
     // Gerar username único a partir do email
-    const username = dto.email.split('@')[0] + uuidv4().slice(0, 4);
+    const username = dto.email.split('@')[0] + randomUUID().slice(0, 4);
 
     try {
       // Hash da senha
@@ -171,7 +169,7 @@ export class AuthService {
       return await this.jwtService.verifyAsync(token, {
         secret: this.configService.get('JWT_SECRET'),
       });
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid token');
     }
   }
@@ -197,7 +195,7 @@ export class AuthService {
     });
 
     // Gerar refresh token único (UUID)
-    const refreshToken = uuidv4();
+    const refreshToken = randomUUID();
 
     // Armazenar em Redis com TTL de 7 dias
     await this.redisService.storeRefreshToken(userId, refreshToken);

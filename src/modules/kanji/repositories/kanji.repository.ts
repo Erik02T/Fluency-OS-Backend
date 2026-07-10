@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import { KanjiFiltersDto } from '../dto';
+import {
+  kanjiDetailInclude,
+  kanjiListInclude,
+  KanjiDetailEntity,
+  KanjiListEntity,
+  KanjiSearchEntity,
+} from '../types/kanji.types';
 
 @Injectable()
 export class KanjiRepository {
@@ -12,15 +19,13 @@ export class KanjiRepository {
    * @param filters KanjiFiltersDto com jlpt, grade, search, etc
    * @returns Array de kanjis com meanings, readings, exemplos
    */
-  async findAll(filters: KanjiFiltersDto): Promise<any[]> {
+  async findAll(filters: KanjiFiltersDto): Promise<KanjiListEntity[]> {
     const skip = (filters.page - 1) * filters.perPage;
 
-    // Construir WHERE clause dinamicamente
     const where: Prisma.KanjiWhereInput = {
       AND: this.buildWhereConditions(filters),
     };
 
-    // Construir ORDER BY
     const orderBy = this.buildOrderBy(filters.sort);
 
     return this.prisma.kanji.findMany({
@@ -28,19 +33,7 @@ export class KanjiRepository {
       orderBy,
       skip,
       take: filters.perPage,
-      include: {
-        meanings: {
-          where: { language: 'pt-BR', isPrimary: true },
-          select: { meaning: true },
-        },
-        readings: {
-          select: {
-            reading: true,
-            type: true,
-            isPrimary: true,
-          },
-        },
-      },
+      include: kanjiListInclude,
     });
   }
 
@@ -62,26 +55,10 @@ export class KanjiRepository {
    * @param id ID do kanji
    * @returns Kanji completo com meanings, readings, examples, radicals
    */
-  async findByIdFull(id: string): Promise<any> {
+  async findByIdFull(id: string): Promise<KanjiDetailEntity | null> {
     return this.prisma.kanji.findUnique({
       where: { id },
-      include: {
-        meanings: {
-          orderBy: { position: 'asc' },
-        },
-        readings: {
-          orderBy: { reading: 'asc' },
-        },
-        examples: {
-          take: 10,
-          orderBy: { position: 'asc' },
-        },
-        radicals: {
-          include: {
-            radical: true,
-          },
-        },
-      },
+      include: kanjiDetailInclude,
     });
   }
 
@@ -90,15 +67,10 @@ export class KanjiRepository {
    * @param character Caractere do kanji (ex: "日")
    * @returns Kanji encontrado ou null
    */
-  async findByCharacter(character: string): Promise<any> {
+  async findByCharacter(character: string): Promise<KanjiDetailEntity | null> {
     return this.prisma.kanji.findUnique({
       where: { character },
-      include: {
-        meanings: true,
-        readings: true,
-        examples: { take: 10 },
-        radicals: { include: { radical: true } },
-      },
+      include: kanjiDetailInclude,
     });
   }
 
@@ -109,24 +81,27 @@ export class KanjiRepository {
    * @param limit Número máximo de resultados
    * @returns Array de kanjis
    */
-  async search(search: string, limit: number = 50): Promise<any[]> {
+  async search(
+    search: string,
+    limit: number = 50,
+  ): Promise<KanjiSearchEntity[]> {
     if (!search || search.length < 1) {
       return [];
     }
 
     const searchTerm = `%${search}%`;
 
-    return this.prisma.$queryRaw`
+    return this.prisma.$queryRaw<KanjiSearchEntity[]>`
       SELECT DISTINCT k.* 
-      FROM "Kanji" k
-      LEFT JOIN "KanjiMeaning" km ON k."id" = km."kanjiId" AND km."language" = 'pt-BR'
-      LEFT JOIN "KanjiReading" kr ON k."id" = kr."kanjiId"
+      FROM "kanjis" k
+      LEFT JOIN "kanji_meanings" km ON k."id" = km."kanjiId" AND km."language" = 'pt-BR'
+      LEFT JOIN "kanji_readings" kr ON k."id" = kr."kanjiId"
       WHERE 
         k."character" ILIKE ${searchTerm}
         OR km."meaning" ILIKE ${searchTerm}
         OR kr."reading" ILIKE ${searchTerm}
-        OR kr."romanization" ILIKE ${searchTerm}
-      ORDER BY k."frequencyRank" ASC
+        OR kr."romanji" ILIKE ${searchTerm}
+      ORDER BY k."frequency" ASC
       LIMIT ${limit}
     `;
   }

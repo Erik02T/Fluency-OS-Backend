@@ -24,7 +24,9 @@ export class KanjiFiltersDto {
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => value?.trim())
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   search?: string;
 
   @IsOptional()

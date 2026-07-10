@@ -2,29 +2,36 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { User } from '@prisma/client';
+import { Role, JLPTLevel } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { UserRepository } from './repositories/user.repository';
 import { RedisService } from '../../common/services/redis.service';
 import * as bcrypt from 'bcryptjs';
 
+jest.mock('bcryptjs');
+
+type TestConfig = Record<string, string>;
+
 describe('AuthService', () => {
   let service: AuthService;
   let userRepository: UserRepository;
   let jwtService: JwtService;
-  let configService: ConfigService;
   let redisService: RedisService;
 
-  // Mock data
-  const mockUser = {
+  const mockUser: User = {
     id: 'user-123',
     email: 'test@example.com',
     username: 'testuser',
     passwordHash: 'hashed_password',
-    name: 'Test User',
+    displayName: 'Test User',
     avatarUrl: null,
-    jlptGoal: 'N3',
-    dailyGoalMin: 30,
-    lastLoginAt: null,
+    role: Role.STUDENT,
+    jlptGoal: JLPTLevel.N3,
+    isEmailVerified: false,
+    isActive: true,
+    lastActiveAt: null,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -46,9 +53,10 @@ describe('AuthService', () => {
             findById: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
-            sanitizeUser: jest.fn((user) => {
-              const { passwordHash, ...rest } = user;
-              return rest;
+            sanitizeUser: jest.fn((user: User): Omit<User, 'passwordHash'> => {
+              const sanitized = { ...user };
+              delete (sanitized as Partial<User>).passwordHash;
+              return sanitized;
             }),
           },
         },
@@ -62,8 +70,8 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key) => {
-              const config = {
+            get: jest.fn((key: string) => {
+              const config: TestConfig = {
                 JWT_SECRET: 'test-secret',
                 JWT_EXPIRATION: '15m',
                 JWT_REFRESH_SECRET: 'test-refresh-secret',
@@ -88,30 +96,31 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     userRepository = module.get<UserRepository>(UserRepository);
     jwtService = module.get<JwtService>(JwtService);
-    configService = module.get<ConfigService>(ConfigService);
     redisService = module.get<RedisService>(RedisService);
   });
 
   describe('register', () => {
     it('should register a new user successfully', async () => {
-      // Mock
-      jest.spyOn(userRepository, 'findByEmail').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'create').mockResolvedValue(mockUser);
+      const findByEmailSpy = jest
+        .spyOn(userRepository, 'findByEmail')
+        .mockResolvedValue(null);
+      const createSpy = jest
+        .spyOn(userRepository, 'create')
+        .mockResolvedValue(mockUser);
       jest.spyOn(jwtService, 'signAsync').mockResolvedValue('access_token_123');
-      jest
+      const storeRefreshTokenSpy = jest
         .spyOn(redisService, 'storeRefreshToken')
         .mockResolvedValue(undefined);
 
-      // Execute
       const result = await service.register(mockCreateUserDto);
 
-      // Assert
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('access_token_123');
       expect(result.refreshToken).toBeDefined();
       expect(result.user.email).toBe(mockUser.email);
-      expect(userRepository.create).toHaveBeenCalled();
-      expect(redisService.storeRefreshToken).toHaveBeenCalled();
+      expect(findByEmailSpy).toHaveBeenCalled();
+      expect(createSpy).toHaveBeenCalled();
+      expect(storeRefreshTokenSpy).toHaveBeenCalled();
     });
 
     it('should throw ConflictException if email already exists', async () => {
@@ -131,10 +140,10 @@ describe('AuthService', () => {
       };
 
       jest.spyOn(userRepository, 'findByEmail').mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(async () => true as never);
-      jest.spyOn(userRepository, 'update').mockResolvedValue(mockUser);
+      jest.mocked(bcrypt.compare).mockResolvedValue(true as never);
+      const updateSpy = jest
+        .spyOn(userRepository, 'update')
+        .mockResolvedValue(mockUser);
       jest.spyOn(jwtService, 'signAsync').mockResolvedValue('access_token_123');
       jest
         .spyOn(redisService, 'storeRefreshToken')
@@ -145,7 +154,7 @@ describe('AuthService', () => {
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('access_token_123');
       expect(result.refreshToken).toBeDefined();
-      expect(userRepository.update).toHaveBeenCalled();
+      expect(updateSpy).toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
@@ -161,9 +170,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password is wrong', async () => {
       jest.spyOn(userRepository, 'findByEmail').mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(async () => false as never);
+      jest.mocked(bcrypt.compare).mockResolvedValue(false as never);
 
       await expect(
         service.login({
@@ -180,13 +187,15 @@ describe('AuthService', () => {
 
       jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
       jest.spyOn(userRepository, 'findById').mockResolvedValue(mockUser);
-      jest.spyOn(jwtService, 'signAsync').mockResolvedValue('new_access_token');
+      const signAsyncSpy = jest
+        .spyOn(jwtService, 'signAsync')
+        .mockResolvedValue('new_access_token');
 
       const result = await service.refreshToken(refreshTokenId);
 
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('new_access_token');
-      expect(jwtService.signAsync).toHaveBeenCalled();
+      expect(signAsyncSpy).toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException if refresh token is invalid', async () => {
@@ -203,12 +212,12 @@ describe('AuthService', () => {
       const refreshTokenId = '550e8400-e29b-41d4-a716-446655440000';
 
       jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
-      jest
+      const invalidateRefreshTokenSpy = jest
         .spyOn(redisService, 'invalidateRefreshToken')
         .mockResolvedValue(undefined);
 
       await expect(service.logout(refreshTokenId)).resolves.not.toThrow();
-      expect(redisService.invalidateRefreshToken).toHaveBeenCalledWith(
+      expect(invalidateRefreshTokenSpy).toHaveBeenCalledWith(
         mockUser.id,
         refreshTokenId,
       );
