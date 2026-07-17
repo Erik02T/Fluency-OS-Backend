@@ -31,6 +31,7 @@ describe('AuthService', () => {
     isEmailVerified: false,
     isActive: true,
     lastActiveAt: null,
+    lastLoginAt: null,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -87,7 +88,7 @@ describe('AuthService', () => {
             storeRefreshToken: jest.fn(),
             validateRefreshToken: jest.fn(),
             invalidateRefreshToken: jest.fn(),
-            get: jest.fn(),
+            findUserIdByRefreshToken: jest.fn(),
           },
         },
       ],
@@ -185,7 +186,9 @@ describe('AuthService', () => {
     it('should refresh token successfully', async () => {
       const refreshTokenId = '550e8400-e29b-41d4-a716-446655440000';
 
-      jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
+      jest
+        .spyOn(redisService, 'findUserIdByRefreshToken')
+        .mockResolvedValue(mockUser.id);
       jest.spyOn(userRepository, 'findById').mockResolvedValue(mockUser);
       const signAsyncSpy = jest
         .spyOn(jwtService, 'signAsync')
@@ -211,7 +214,9 @@ describe('AuthService', () => {
     it('should logout user successfully', async () => {
       const refreshTokenId = '550e8400-e29b-41d4-a716-446655440000';
 
-      jest.spyOn(redisService, 'get').mockResolvedValue(mockUser.id);
+      jest
+        .spyOn(redisService, 'findUserIdByRefreshToken')
+        .mockResolvedValue(mockUser.id);
       const invalidateRefreshTokenSpy = jest
         .spyOn(redisService, 'invalidateRefreshToken')
         .mockResolvedValue(undefined);

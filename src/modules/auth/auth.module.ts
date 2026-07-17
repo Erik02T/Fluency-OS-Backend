@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import type { StringValue } from 'ms';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserRepository, PrismaService } from './repositories';
@@ -8,14 +9,18 @@ import { CommonModule } from '../../common/common.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-    JwtModule.register({
-      global: true,
-      secret: process.env.JWT_SECRET || 'default-secret-change-in-production',
-      signOptions: { expiresIn: '15m' },
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        global: true,
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: (configService.get<string>('JWT_EXPIRATION') ||
+            '15m') as StringValue,
+        },
+      }),
     }),
     CommonModule,
   ],
