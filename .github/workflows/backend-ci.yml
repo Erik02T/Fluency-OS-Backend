@@ -1,0 +1,89 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - fix/**
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fluency_user
+          POSTGRES_PASSWORD: fluency_secure_password_123
+          POSTGRES_DB: fluency_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U fluency_user -d fluency_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      CI: true
+      NODE_ENV: test
+      APP_PORT: 3001
+      DATABASE_URL: postgresql://fluency_user:fluency_secure_password_123@localhost:5432/fluency_db
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_SECRET: test_super_secret_jwt_key
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_SECRET: test_super_secret_refresh_key
+      JWT_REFRESH_EXPIRATION: 7d
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+      - name: E2E tests
+        run: npm run test:e2e -- --runInBand
