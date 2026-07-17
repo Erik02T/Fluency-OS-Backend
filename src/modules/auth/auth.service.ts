@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +15,8 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private userRepository: UserRepository,
     private jwtService: JwtService,
@@ -57,7 +60,9 @@ export class AuthService {
         user: this.userRepository.sanitizeUser(user),
       };
     } catch (error) {
-      console.error('REGISTER ERROR:', error);
+      this.logger.error(
+        `Failed to register user: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -109,9 +114,8 @@ export class AuthService {
     }
 
     // Localizar o userId associado ao refresh token salvo
-    const storedUserId = await this.redisService.findUserIdByRefreshToken(
-      refreshToken,
-    );
+    const storedUserId =
+      await this.redisService.findUserIdByRefreshToken(refreshToken);
 
     if (!storedUserId) {
       throw new UnauthorizedException('Refresh token expired or invalid');
@@ -147,9 +151,8 @@ export class AuthService {
     }
 
     // Buscar userId do refresh token para deletar corretamente
-    const storedUserId = await this.redisService.findUserIdByRefreshToken(
-      refreshToken,
-    );
+    const storedUserId =
+      await this.redisService.findUserIdByRefreshToken(refreshToken);
 
     if (storedUserId) {
       // Deletar refresh token específico
