@@ -108,9 +108,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token format');
     }
 
-    // Buscar payload antigo do Redis (userId está armazenado como value)
-    const storedUserId = await this.redisService.get(
-      `refresh_token:*:${refreshToken}`,
+    // Localizar o userId associado ao refresh token salvo
+    const storedUserId = await this.redisService.findUserIdByRefreshToken(
+      refreshToken,
     );
 
     if (!storedUserId) {
@@ -147,8 +147,9 @@ export class AuthService {
     }
 
     // Buscar userId do refresh token para deletar corretamente
-    const pattern = `refresh_token:*:${refreshToken}`;
-    const storedUserId = await this.redisService.get(pattern);
+    const storedUserId = await this.redisService.findUserIdByRefreshToken(
+      refreshToken,
+    );
 
     if (storedUserId) {
       // Deletar refresh token específico
