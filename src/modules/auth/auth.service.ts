@@ -52,7 +52,7 @@ export class AuthService {
       });
 
       // Gerar tokens
-      const tokens = await this.generateTokens(user.id, user.email);
+      const tokens = await this.generateTokens(user.id, user.email, user.role);
 
       // Retornar resposta
       return {
@@ -94,7 +94,7 @@ export class AuthService {
     });
 
     // Gerar tokens
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     return {
       ...tokens,
@@ -131,6 +131,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
+      role: user.role,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -187,10 +188,12 @@ export class AuthService {
   private async generateTokens(
     userId: string,
     email: string,
+    role: JwtPayload['role'],
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const payload: JwtPayload = {
       sub: userId,
       email,
+      role,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
