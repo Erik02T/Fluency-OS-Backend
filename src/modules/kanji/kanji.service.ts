@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ReadingType } from '@prisma/client';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
 import {
+  CreateKanjiDto,
   KanjiFiltersDto,
   KanjiListResponseDto,
   KanjiDetailResponseDto,
   PaginatedKanjiResponseDto,
+  UpdateKanjiDto,
 } from './dto';
 import {
   KanjiDetailEntity,
@@ -30,8 +36,8 @@ export class KanjiService {
     filters: KanjiFiltersDto,
     userId?: string,
   ): Promise<PaginatedKanjiResponseDto> {
-    const kanjis = await this.kanjiRepository.findAll(filters);
-    const total = await this.kanjiRepository.count(filters);
+    const kanjis = await this.kanjiRepository.findAll(filters, userId);
+    const total = await this.kanjiRepository.count(filters, userId);
 
     let progressMap = new Map<string, UserKanjiProgressEntity>();
     if (userId) {
@@ -115,8 +121,9 @@ export class KanjiService {
   async search(
     query: string,
     userId?: string,
+    limit?: number,
   ): Promise<KanjiListResponseDto[]> {
-    const kanjis = await this.kanjiRepository.search(query);
+    const kanjis = await this.kanjiRepository.search(query, limit);
 
     let progressMap = new Map<string, UserKanjiProgressEntity>();
     if (userId) {
@@ -128,6 +135,51 @@ export class KanjiService {
     }
 
     return kanjis.map((kanji) => this.toListDto(kanji, progressMap));
+  }
+
+  async createAdminKanji(dto: CreateKanjiDto): Promise<KanjiDetailResponseDto> {
+    const existingKanji = await this.kanjiRepository.findByCharacter(
+      dto.character,
+    );
+
+    if (existingKanji) {
+      throw new ConflictException(`Kanji '${dto.character}' already exists`);
+    }
+
+    const kanji = await this.kanjiRepository.createAdminKanji(dto);
+
+    return this.toDetailDto(kanji);
+  }
+
+  async updateAdminKanji(
+    id: string,
+    dto: UpdateKanjiDto,
+  ): Promise<KanjiDetailResponseDto> {
+    if (dto.character) {
+      const existingKanji = await this.kanjiRepository.findByCharacter(
+        dto.character,
+      );
+
+      if (existingKanji && existingKanji.id !== id) {
+        throw new ConflictException(`Kanji '${dto.character}' already exists`);
+      }
+    }
+
+    const kanji = await this.kanjiRepository.updateAdminKanji(id, dto);
+
+    if (!kanji) {
+      throw new NotFoundException(`Kanji with id ${id} not found`);
+    }
+
+    return this.toDetailDto(kanji);
+  }
+
+  async deleteAdminKanji(id: string): Promise<void> {
+    const deleted = await this.kanjiRepository.deleteAdminKanji(id);
+
+    if (!deleted) {
+      throw new NotFoundException(`Kanji with id ${id} not found`);
+    }
   }
 
   /**

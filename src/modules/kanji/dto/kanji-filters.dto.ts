@@ -5,9 +5,28 @@ import {
   Min,
   Max,
   IsBoolean,
+  IsIn,
 } from 'class-validator';
 import { JLPTLevel } from '@prisma/client';
 import { Type, Transform } from 'class-transformer';
+
+const booleanQueryParam = ({ value }: { value: unknown }) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase();
+    if (normalized === 'true') {
+      return true;
+    }
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+
+  return value;
+};
 
 export class KanjiFiltersDto {
   @IsOptional()
@@ -30,17 +49,17 @@ export class KanjiFiltersDto {
   search?: string;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(booleanQueryParam)
   @IsBoolean()
   favorites?: boolean;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(booleanQueryParam)
   @IsBoolean()
   mastered?: boolean;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(booleanQueryParam)
   @IsBoolean()
   suspended?: boolean;
 
@@ -54,6 +73,10 @@ export class KanjiFiltersDto {
   perPage: number = 20;
 
   @IsOptional()
-  @IsString()
-  sort?: 'frequency' | 'jlpt' | 'grade' | 'strokes';
+  @IsIn(['frequency', 'jlpt', 'grade', 'strokes', 'srsLevel', 'mastered'])
+  sort?: 'frequency' | 'jlpt' | 'grade' | 'strokes' | 'srsLevel' | 'mastered';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: 'asc' | 'desc' = 'asc';
 }

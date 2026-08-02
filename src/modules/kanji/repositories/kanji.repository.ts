@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
-import { KanjiFiltersDto } from '../dto';
+import { CreateKanjiDto, KanjiFiltersDto, UpdateKanjiDto } from '../dto';
 import {
   kanjiDetailInclude,
   kanjiListInclude,
   KanjiDetailEntity,
   KanjiListEntity,
-  KanjiSearchEntity,
 } from '../types/kanji.types';
+
+type ProgressSortField = 'srsLevel' | 'mastered';
+type SortOrder = 'asc' | 'desc';
+type ProgressSortableKanji = KanjiListEntity & {
+  userProgress: Array<{
+    srsLevel: number;
+    isMastered: boolean;
+  }>;
+};
 
 @Injectable()
 export class KanjiRepository {
@@ -19,18 +27,39 @@ export class KanjiRepository {
    * @param filters KanjiFiltersDto com jlpt, grade, search, etc
    * @returns Array de kanjis com meanings, readings, exemplos
    */
-  async findAll(filters: KanjiFiltersDto): Promise<KanjiListEntity[]> {
+  async findAll(
+    filters: KanjiFiltersDto,
+    userId?: string,
+  ): Promise<KanjiListEntity[]> {
     const skip = (filters.page - 1) * filters.perPage;
+    const where = this.buildWhere(filters, userId);
 
-    const where: Prisma.KanjiWhereInput = {
-      AND: this.buildWhereConditions(filters),
-    };
+    if (this.isProgressSort(filters.sort) && userId) {
+      const kanjis = await this.prisma.kanji.findMany({
+        where,
+        orderBy: this.buildOrderBy('frequency', 'asc'),
+        include: {
+          ...kanjiListInclude,
+          userProgress: {
+            where: { userId },
+            select: {
+              srsLevel: true,
+              isMastered: true,
+            },
+            take: 1,
+          },
+        },
+      });
 
-    const orderBy = this.buildOrderBy(filters.sort);
+      return this.sortByProgress(kanjis, filters.sort, filters.order).slice(
+        skip,
+        skip + filters.perPage,
+      );
+    }
 
     return this.prisma.kanji.findMany({
       where,
-      orderBy,
+      orderBy: this.buildOrderBy(filters.sort, filters.order),
       skip,
       take: filters.perPage,
       include: kanjiListInclude,
@@ -42,12 +71,8 @@ export class KanjiRepository {
    * @param filters KanjiFiltersDto
    * @returns Contagem total
    */
-  async count(filters: KanjiFiltersDto): Promise<number> {
-    const where: Prisma.KanjiWhereInput = {
-      AND: this.buildWhereConditions(filters),
-    };
-
-    return this.prisma.kanji.count({ where });
+  async count(filters: KanjiFiltersDto, userId?: string): Promise<number> {
+    return this.prisma.kanji.count({ where: this.buildWhere(filters, userId) });
   }
 
   /**
@@ -74,6 +99,60 @@ export class KanjiRepository {
     });
   }
 
+  async createAdminKanji(dto: CreateKanjiDto): Promise<KanjiDetailEntity> {
+    return this.prisma.$transaction(async (tx) => {
+      const kanji = await tx.kanji.create({
+        data: this.buildKanjiCreateData(dto),
+      });
+
+      await this.syncKanjiRelations(tx, kanji.id, dto);
+
+      return this.findByIdFullWithClient(tx, kanji.id);
+    });
+  }
+
+  async updateAdminKanji(
+    id: string,
+    dto: UpdateKanjiDto,
+  ): Promise<KanjiDetailEntity | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.kanji.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return null;
+      }
+
+      await tx.kanji.update({
+        where: { id },
+        data: this.buildKanjiUpdateData(dto),
+      });
+
+      await this.syncKanjiRelations(tx, id, dto);
+
+      return this.findByIdFullWithClient(tx, id);
+    });
+  }
+
+  async deleteAdminKanji(id: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.kanji.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return false;
+      }
+
+      await tx.kanji.delete({ where: { id } });
+
+      return true;
+    });
+  }
+
   /**
    * Buscar por term (character, meaning, onyomi, kunyomi)
    * Usa ILIKE para case-insensitive partial match
@@ -81,29 +160,177 @@ export class KanjiRepository {
    * @param limit Número máximo de resultados
    * @returns Array de kanjis
    */
-  async search(
-    search: string,
-    limit: number = 50,
-  ): Promise<KanjiSearchEntity[]> {
+  async search(search: string, limit: number = 50): Promise<KanjiListEntity[]> {
     if (!search || search.length < 1) {
       return [];
     }
 
-    const searchTerm = `%${search}%`;
+    return this.prisma.kanji.findMany({
+      where: {
+        OR: [
+          {
+            character: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+          {
+            meanings: {
+              some: {
+                meaning: { contains: search, mode: 'insensitive' },
+                language: 'pt-BR',
+              },
+            },
+          },
+          {
+            readings: {
+              some: {
+                OR: [
+                  { reading: { contains: search } },
+                  {
+                    romanji: { contains: search, mode: 'insensitive' },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      orderBy: [{ frequency: 'asc' }, { id: 'asc' }],
+      take: limit,
+      include: kanjiListInclude,
+    });
+  }
 
-    return this.prisma.$queryRaw<KanjiSearchEntity[]>`
-      SELECT DISTINCT k.* 
-      FROM "kanjis" k
-      LEFT JOIN "kanji_meanings" km ON k."id" = km."kanjiId" AND km."language" = 'pt-BR'
-      LEFT JOIN "kanji_readings" kr ON k."id" = kr."kanjiId"
-      WHERE 
-        k."character" ILIKE ${searchTerm}
-        OR km."meaning" ILIKE ${searchTerm}
-        OR kr."reading" ILIKE ${searchTerm}
-        OR kr."romanji" ILIKE ${searchTerm}
-      ORDER BY k."frequency" ASC
-      LIMIT ${limit}
-    `;
+  private async findByIdFullWithClient(
+    client: Prisma.TransactionClient,
+    id: string,
+  ): Promise<KanjiDetailEntity> {
+    const kanji = await client.kanji.findUnique({
+      where: { id },
+      include: kanjiDetailInclude,
+    });
+
+    if (!kanji) {
+      throw new Error(`Kanji with id ${id} not found after write operation`);
+    }
+
+    return kanji;
+  }
+
+  private buildKanjiCreateData(dto: CreateKanjiDto): Prisma.KanjiCreateInput {
+    return {
+      character: dto.character,
+      unicodeCodepoint: dto.unicodeCodepoint,
+      jlptLevel: dto.jlptLevel,
+      grade: dto.grade,
+      strokeCount: dto.strokeCount,
+      frequency: dto.frequency,
+      notes: dto.notes,
+      romanization: dto.romanization,
+    };
+  }
+
+  private buildKanjiUpdateData(dto: UpdateKanjiDto): Prisma.KanjiUpdateInput {
+    const data: Prisma.KanjiUpdateInput = {};
+
+    if (dto.character !== undefined) data.character = dto.character;
+    if (dto.unicodeCodepoint !== undefined)
+      data.unicodeCodepoint = dto.unicodeCodepoint;
+    if (dto.jlptLevel !== undefined) data.jlptLevel = dto.jlptLevel;
+    if (dto.grade !== undefined) data.grade = dto.grade;
+    if (dto.strokeCount !== undefined) data.strokeCount = dto.strokeCount;
+    if (dto.frequency !== undefined) data.frequency = dto.frequency;
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.romanization !== undefined) data.romanization = dto.romanization;
+
+    return data;
+  }
+
+  private async syncKanjiRelations(
+    client: Prisma.TransactionClient,
+    kanjiId: string,
+    dto: CreateKanjiDto | UpdateKanjiDto,
+  ): Promise<void> {
+    if (dto.meanings !== undefined) {
+      await client.kanjiMeaning.deleteMany({ where: { kanjiId } });
+
+      if (dto.meanings.length > 0) {
+        await client.kanjiMeaning.createMany({
+          data: dto.meanings.map((meaning, position) => ({
+            kanjiId,
+            meaning: meaning.meaning,
+            language: meaning.language ?? 'pt-BR',
+            isPrimary: meaning.isPrimary ?? position === 0,
+            position,
+          })),
+        });
+      }
+    }
+
+    if (dto.readings !== undefined) {
+      await client.kanjiReading.deleteMany({ where: { kanjiId } });
+
+      if (dto.readings.length > 0) {
+        await client.kanjiReading.createMany({
+          data: dto.readings.map((reading) => ({
+            kanjiId,
+            reading: reading.reading,
+            type: reading.type,
+            romanji: reading.romanji,
+            isPrimary: reading.isPrimary ?? false,
+          })),
+        });
+      }
+    }
+
+    if (dto.examples !== undefined) {
+      await client.kanjiExample.deleteMany({ where: { kanjiId } });
+
+      if (dto.examples.length > 0) {
+        await client.kanjiExample.createMany({
+          data: dto.examples.map((example, position) => ({
+            kanjiId,
+            word: example.word,
+            reading: example.reading,
+            meaning: example.meaning,
+            jlptLevel: example.jlptLevel ?? null,
+            position,
+          })),
+        });
+      }
+    }
+
+    if (dto.radicals !== undefined) {
+      await client.kanjiRadical.deleteMany({ where: { kanjiId } });
+
+      for (const radicalData of dto.radicals) {
+        const radical = await client.radical.upsert({
+          where: { character: radicalData.character },
+          update: {
+            name: radicalData.name,
+            meaning: radicalData.meaning,
+            strokeCount: radicalData.strokeCount,
+            position: radicalData.position,
+          },
+          create: {
+            character: radicalData.character,
+            name: radicalData.name,
+            meaning: radicalData.meaning,
+            strokeCount: radicalData.strokeCount,
+            position: radicalData.position,
+          },
+        });
+
+        await client.kanjiRadical.create({
+          data: {
+            kanjiId,
+            radicalId: radical.id,
+            isPrimary: radicalData.isPrimary ?? false,
+          },
+        });
+      }
+    }
   }
 
   /**
@@ -111,8 +338,18 @@ export class KanjiRepository {
    * @param filters KanjiFiltersDto
    * @returns Array de condições para AND
    */
+  private buildWhere(
+    filters: KanjiFiltersDto,
+    userId?: string,
+  ): Prisma.KanjiWhereInput {
+    return {
+      AND: this.buildWhereConditions(filters, userId),
+    };
+  }
+
   private buildWhereConditions(
     filters: KanjiFiltersDto,
+    userId?: string,
   ): Prisma.KanjiWhereInput[] {
     const conditions: Prisma.KanjiWhereInput[] = [];
 
@@ -126,14 +363,13 @@ export class KanjiRepository {
 
     if (filters.search && filters.search.length > 0) {
       conditions.push({
-        character: {
-          contains: filters.search,
-          mode: 'insensitive',
-        },
-      });
-      conditions.push({
         OR: [
-          { character: { contains: filters.search } },
+          {
+            character: {
+              contains: filters.search,
+              mode: 'insensitive',
+            },
+          },
           {
             meanings: {
               some: {
@@ -158,7 +394,64 @@ export class KanjiRepository {
       });
     }
 
+    this.addProgressFilter(conditions, userId, 'isFavorite', filters.favorites);
+    this.addProgressFilter(conditions, userId, 'isMastered', filters.mastered);
+    this.addProgressFilter(
+      conditions,
+      userId,
+      'isSuspended',
+      filters.suspended,
+    );
+
     return conditions;
+  }
+
+  private addProgressFilter(
+    conditions: Prisma.KanjiWhereInput[],
+    userId: string | undefined,
+    field: 'isFavorite' | 'isMastered' | 'isSuspended',
+    value?: boolean,
+  ): void {
+    if (value === undefined) {
+      return;
+    }
+
+    if (!userId) {
+      if (value) {
+        conditions.push({ id: { in: [] } });
+      }
+      return;
+    }
+
+    if (value) {
+      conditions.push({
+        userProgress: {
+          some: {
+            userId,
+            [field]: true,
+          },
+        },
+      });
+      return;
+    }
+
+    conditions.push({
+      OR: [
+        {
+          userProgress: {
+            none: { userId },
+          },
+        },
+        {
+          userProgress: {
+            some: {
+              userId,
+              [field]: false,
+            },
+          },
+        },
+      ],
+    });
   }
 
   /**
@@ -166,17 +459,57 @@ export class KanjiRepository {
    * @param sort Campo para ordenação
    * @returns Ordenação Prisma
    */
-  private buildOrderBy(sort?: string): Prisma.KanjiOrderByWithRelationInput {
+  private buildOrderBy(
+    sort?: string,
+    order: SortOrder = 'asc',
+  ): Prisma.KanjiOrderByWithRelationInput[] {
     switch (sort) {
       case 'jlpt':
-        return { jlptLevel: 'asc' };
+        return [{ jlptLevel: order }, { id: 'asc' }];
       case 'grade':
-        return { grade: 'asc' };
+        return [{ grade: order }, { id: 'asc' }];
       case 'strokes':
-        return { strokeCount: 'asc' };
+        return [{ strokeCount: order }, { id: 'asc' }];
       case 'frequency':
+      case 'srsLevel':
+      case 'mastered':
       default:
-        return { frequency: 'asc' };
+        return [{ frequency: order }, { id: 'asc' }];
     }
+  }
+
+  private isProgressSort(sort?: string): sort is ProgressSortField {
+    return sort === 'srsLevel' || sort === 'mastered';
+  }
+
+  private sortByProgress(
+    kanjis: ProgressSortableKanji[],
+    sort: ProgressSortField,
+    order: SortOrder = 'asc',
+  ): KanjiListEntity[] {
+    const direction = order === 'asc' ? 1 : -1;
+
+    return [...kanjis].sort((left, right) => {
+      const leftProgress = left.userProgress[0];
+      const rightProgress = right.userProgress[0];
+      const leftValue =
+        sort === 'srsLevel'
+          ? (leftProgress?.srsLevel ?? 0)
+          : leftProgress?.isMastered
+            ? 1
+            : 0;
+      const rightValue =
+        sort === 'srsLevel'
+          ? (rightProgress?.srsLevel ?? 0)
+          : rightProgress?.isMastered
+            ? 1
+            : 0;
+
+      if (leftValue !== rightValue) {
+        return (leftValue - rightValue) * direction;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
   }
 }
