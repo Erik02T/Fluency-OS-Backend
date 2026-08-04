@@ -8,6 +8,7 @@
 |---|---|
 | Base URL | `https://api.fluencyos.app/v1` |
 | Auth header | `Authorization: Bearer <access_token>` |
+| Refresh token | Cookie HttpOnly `fluency-admin-refresh-token` (7 dias) |
 | Content-Type | `application/json` |
 | Versionamento | Path da URL (`/v1`, `/v2`) |
 | Paginação | Cursor-based (`next_cursor`, `prev_cursor`, `limit`) |
@@ -15,6 +16,8 @@
 | Erros | [RFC 7807 — Problem Details](https://www.rfc-editor.org/rfc/rfc7807) |
 
 Documentação interativa (Swagger/OpenAPI) disponível em `/docs` com o servidor rodando.
+
+Para aplicações web, envie requests de `/auth/login`, `/auth/refresh` e `/auth/logout` com `credentials: include` para permitir o ciclo de sessão via cookie HttpOnly.
 
 ## Auth
 
@@ -45,7 +48,7 @@ Documentação interativa (Swagger/OpenAPI) disponível em `/docs` com o servido
 
 // Response 201
 {
-  "user": { /* ...UserPublic */ },
+  "user": { "id": "...", "email": "user@example.com", "role": "STUDENT" },
   "access_token": "eyJ...",
   "refresh_token": "eyJ...",
   "expires_in": 900
@@ -64,7 +67,7 @@ Erros: `409` e-mail já cadastrado · `409` username já em uso · `422` valida�
 
 // Response 200
 {
-  "user": { /* ...UserPublic */ },
+  "user": { "id": "...", "email": "user@example.com", "role": "ADMIN" },
   "access_token": "eyJ...",
   "refresh_token": "eyJ...",
   "expires_in": 900
