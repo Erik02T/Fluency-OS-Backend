@@ -165,6 +165,19 @@ export class AuthService {
   }
 
   /**
+   * Retorna os dados públicos do usuário autenticado
+   * @param userId ID do usuário autenticado
+   */
+  async getCurrentUser(userId: string) {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.userRepository.sanitizeUser(user);
+  }
+
+  /**
    * Valida um JWT token
    * @param token JWT token
    * @returns JwtPayload se válido
