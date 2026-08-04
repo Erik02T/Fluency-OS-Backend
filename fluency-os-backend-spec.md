@@ -2,6 +2,40 @@
 ### Sistema Premium de Aquisição Natural de Japonês
 > Documento de Arquitetura e Engenharia · Versão 1.0 · Nível: Produção
 
+## STATUS REAL DE IMPLEMENTAÇÃO (RELEASE ATUAL)
+
+Este documento combina especificação alvo e estado real de código. Para evitar ambiguidade, a classificação oficial por release segue abaixo.
+
+Fonte de verdade para status Implementado:
+
+- src/app.module.ts (módulos ativos)
+- controllers existentes em src/
+
+### Implementado
+
+- Auth: registro, login, refresh, logout, me
+- Kanji público: listagem, busca, detalhe
+- Kanji admin: listagem, criação, edição, remoção
+- Dashboard mínimo: GET /dashboard/summary
+- Health: GET /, GET /health/live, GET /health, GET /health/ready
+
+### Em desenvolvimento
+
+- Dashboard expandido (overview, streak detalhado, daily-goal, heatmap, milestones)
+
+### Planejado/Futuro
+
+- Users
+- Review (sessões SRS completas)
+- Vocabulary
+- Grammar
+- Immersion
+- Sentence Mining
+- Notifications
+- Custom Lists
+- AI Tutor
+- WebSocket de eventos de produto
+
 ---
 
 ## ÍNDICE
@@ -948,6 +982,52 @@ CREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE NOT i
 ---
 
 # MÓDULO 05 — API REST COMPLETA
+
+## 5.0 · Status Operacional das Rotas
+
+As seções 5.1+ descrevem o contrato alvo do produto. Nem todas as rotas deste módulo estão implementadas na release atual.
+
+### 5.0.1 Implementado
+
+```
+GET    /
+GET    /health/live
+GET    /health
+GET    /health/ready
+
+POST   /auth/register
+POST   /auth/login
+POST   /auth/refresh
+POST   /auth/logout
+GET    /auth/me
+
+GET    /kanji
+GET    /kanji/search
+GET    /kanji/search/:query
+GET    /kanji/:id
+
+GET    /admin/kanjis
+POST   /admin/kanjis
+PUT    /admin/kanjis/:id
+DELETE /admin/kanjis/:id
+
+GET    /dashboard/summary
+```
+
+### 5.0.2 Em desenvolvimento
+
+```
+GET    /dashboard/overview
+GET    /dashboard/streak
+GET    /dashboard/daily-goal
+GET    /dashboard/heatmap
+GET    /dashboard/recent-activity
+GET    /dashboard/milestones
+```
+
+### 5.0.3 Planejado/Futuro
+
+Todos os demais grupos do módulo 05 (users, review, vocabulary, grammar, immersion, sentence mining, notifications, custom lists, AI tutor) permanecem como escopo alvo e ainda não devem ser tratados como ativos na release atual.
 
 ## 5.1 · Convenções da API
 

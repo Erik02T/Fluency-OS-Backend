@@ -33,6 +33,12 @@ O backend do Fluency OS é um monólito modular construído em **NestJS**, organ
 - **Consistência transacional** — toda atualização de SRS (progresso + resposta) roda em uma única transação de banco.
 - **Tempo real desacoplado** — o gateway WebSocket publica eventos de domínio sem que os serviços conheçam detalhes de transporte.
 
+## Observabilidade Operacional
+
+- **Request ID por requisição**: cada request recebe/propaga `x-request-id`; esse id é reutilizado nos logs de controller e service para correlação.
+- **Logs estruturados JSON**: eventos HTTP e de domínio (`auth.*`, `kanji.*`) são emitidos em JSON com `timestamp`, `level`, `context`, `event` e `requestId`.
+- **Health checks**: `GET /health/live` (liveness) e `GET /health`/`GET /health/ready` (readiness com verificação de DB + Redis).
+
 ## Fluxo Principal: Sessão de Revisão SRS
 
 ```

@@ -25,6 +25,7 @@ import {
   KanjiDetailResponseDto,
   KanjiListResponseDto,
 } from './dto';
+import { logStructured } from '../../common/logging/structured-log';
 
 @ApiTags('Kanji')
 @Controller('kanji')
@@ -63,6 +64,10 @@ export class KanjiController {
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<PaginatedKanjiResponseDto> {
     const userId = req.user?.id;
+    logStructured('info', 'KanjiController', 'kanji.list.request', {
+      userId,
+      filters,
+    });
     return this.kanjiService.findAll(filters, userId);
   }
 
@@ -90,6 +95,11 @@ export class KanjiController {
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<KanjiListResponseDto[]> {
     const userId = req.user?.id;
+    logStructured('info', 'KanjiController', 'kanji.search.request', {
+      userId,
+      query: queryDto.q,
+      limit: queryDto.limit,
+    });
     return this.kanjiService.search(queryDto.q, userId, queryDto.limit);
   }
 
@@ -116,6 +126,10 @@ export class KanjiController {
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<KanjiListResponseDto[]> {
     const userId = req.user?.id;
+    logStructured('info', 'KanjiController', 'kanji.search.legacy.request', {
+      userId,
+      query,
+    });
     return this.kanjiService.search(query, userId);
   }
 
@@ -147,6 +161,10 @@ export class KanjiController {
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<KanjiDetailResponseDto> {
     const userId = req.user?.id;
+    logStructured('info', 'KanjiController', 'kanji.detail.request', {
+      userId,
+      kanjiId: id,
+    });
     return this.kanjiService.findById(id, userId);
   }
 }
