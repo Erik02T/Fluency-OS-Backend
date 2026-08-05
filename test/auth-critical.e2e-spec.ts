@@ -12,6 +12,10 @@ interface AuthBody {
   };
 }
 
+interface RefreshBody {
+  accessToken: string;
+}
+
 function assertAuthBody(body: unknown): asserts body is AuthBody {
   if (
     typeof body !== 'object' ||
@@ -21,6 +25,20 @@ function assertAuthBody(body: unknown): asserts body is AuthBody {
   ) {
     throw new Error(
       'Invalid auth response body: expected accessToken and user',
+    );
+  }
+}
+
+function assertRefreshBody(body: unknown): asserts body is RefreshBody {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('accessToken' in body) ||
+    typeof (body as { accessToken?: unknown }).accessToken !== 'string' ||
+    !(body as { accessToken?: unknown }).accessToken
+  ) {
+    throw new Error(
+      'Invalid refresh response body: expected non-empty string accessToken',
     );
   }
 }
@@ -88,9 +106,8 @@ describe('Auth Critical E2E', () => {
   it('refresh de sessão com cookie válido', async () => {
     const response = await agent.post('/auth/refresh').send({}).expect(200);
 
-    assertAuthBody(response.body);
+    assertRefreshBody(response.body);
     expect(response.body).toHaveProperty('accessToken');
-    expect(response.body.accessToken).toBeTruthy();
 
     accessToken = response.body.accessToken;
   });
