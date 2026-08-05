@@ -101,7 +101,9 @@ describe('Kanji Core E2E', () => {
       await prisma.kanji.deleteMany({ where: { id: createdKanjiId } });
     }
 
-    await prisma.user.deleteMany({ where: { email: { in: [studentEmail, adminEmail] } } });
+    await prisma.user.deleteMany({
+      where: { email: { in: [studentEmail, adminEmail] } },
+    });
     await app.close();
   });
 
@@ -163,7 +165,9 @@ describe('Kanji Core E2E', () => {
     ).toBe(true);
 
     const filterResponse = await request(app.getHttpServer())
-      .get(`/kanji?search=${encodeURIComponent(testCharacter)}&jlpt=N2&page=1&perPage=20`)
+      .get(
+        `/kanji?search=${encodeURIComponent(testCharacter)}&jlpt=N2&page=1&perPage=20`,
+      )
       .expect(200);
 
     expect(Array.isArray(filterResponse.body.data)).toBe(true);
@@ -309,7 +313,10 @@ describe('Kanji Core E2E', () => {
   });
 
   it('nega acesso admin sem autenticação', async () => {
-    await request(app.getHttpServer()).post('/admin/kanjis').send({}).expect(401);
+    await request(app.getHttpServer())
+      .post('/admin/kanjis')
+      .send({})
+      .expect(401);
   });
 
   it('nega acesso admin para usuário comum', async () => {
@@ -335,6 +342,8 @@ describe('Kanji Core E2E', () => {
 
     createdKanjiId = '';
 
-    await request(app.getHttpServer()).get(`/kanji/${deletedKanjiId}`).expect(404);
+    await request(app.getHttpServer())
+      .get(`/kanji/${deletedKanjiId}`)
+      .expect(404);
   });
 });

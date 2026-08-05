@@ -42,7 +42,12 @@ export class AppService {
     };
 
     if (response.status !== 'ok') {
-      logStructured('error', 'HealthCheck', 'health.readiness.failed', response);
+      logStructured(
+        'error',
+        'HealthCheck',
+        'health.readiness.failed',
+        response,
+      );
       throw new ServiceUnavailableException(response);
     }
 

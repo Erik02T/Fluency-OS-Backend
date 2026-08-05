@@ -1,5 +1,10 @@
 import { Controller, Get, Request, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import {
@@ -12,10 +17,14 @@ import {
 @UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardSummaryController {
-  constructor(private readonly dashboardSummaryService: DashboardSummaryService) {}
+  constructor(
+    private readonly dashboardSummaryService: DashboardSummaryService,
+  ) {}
 
   @Get('summary')
-  @ApiOperation({ summary: 'Resumo mínimo do dashboard do usuário autenticado' })
+  @ApiOperation({
+    summary: 'Resumo mínimo do dashboard do usuário autenticado',
+  })
   @ApiResponse({
     status: 200,
     description: 'Resumo retornado com sucesso',

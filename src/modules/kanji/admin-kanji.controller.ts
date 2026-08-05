@@ -78,10 +78,15 @@ export class AdminKanjiController {
     type: KanjiDetailResponseDto,
   })
   async create(@Body() dto: CreateKanjiDto): Promise<KanjiDetailResponseDto> {
-    logStructured('info', 'AdminKanjiController', 'admin.kanji.create.request', {
-      character: dto.character,
-      jlptLevel: dto.jlptLevel,
-    });
+    logStructured(
+      'info',
+      'AdminKanjiController',
+      'admin.kanji.create.request',
+      {
+        character: dto.character,
+        jlptLevel: dto.jlptLevel,
+      },
+    );
     return this.kanjiService.createAdminKanji(dto);
   }
 
@@ -97,10 +102,15 @@ export class AdminKanjiController {
     @Param('id') id: string,
     @Body() dto: UpdateKanjiDto,
   ): Promise<KanjiDetailResponseDto> {
-    logStructured('info', 'AdminKanjiController', 'admin.kanji.update.request', {
-      kanjiId: id,
-      payloadKeys: Object.keys(dto),
-    });
+    logStructured(
+      'info',
+      'AdminKanjiController',
+      'admin.kanji.update.request',
+      {
+        kanjiId: id,
+        payloadKeys: Object.keys(dto),
+      },
+    );
     return this.kanjiService.updateAdminKanji(id, dto);
   }
 
@@ -110,9 +120,14 @@ export class AdminKanjiController {
   @ApiParam({ name: 'id', type: String, example: 'clxyz1234567890' })
   @ApiResponse({ status: 204, description: 'Kanji removido com sucesso' })
   async delete(@Param('id') id: string): Promise<void> {
-    logStructured('info', 'AdminKanjiController', 'admin.kanji.delete.request', {
-      kanjiId: id,
-    });
+    logStructured(
+      'info',
+      'AdminKanjiController',
+      'admin.kanji.delete.request',
+      {
+        kanjiId: id,
+      },
+    );
     await this.kanjiService.deleteAdminKanji(id);
   }
 }

@@ -183,9 +183,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/refresh', () => {
     it('should refresh access token', async () => {
-      const response = await authAgent
-        .post('/auth/refresh')
-        .expect(200);
+      const response = await authAgent.post('/auth/refresh').expect(200);
 
       const body = parseRefreshTokenBody(response.body);
       expect(body.accessToken).toBeTruthy();
@@ -203,9 +201,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/logout', () => {
     it('should logout user', async () => {
-      await authAgent
-        .post('/auth/logout')
-        .expect(200);
+      await authAgent.post('/auth/logout').expect(200);
     });
   });
 });

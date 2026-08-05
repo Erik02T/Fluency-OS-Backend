@@ -19,7 +19,9 @@ function assertAuthBody(body: unknown): asserts body is AuthBody {
     !('accessToken' in body) ||
     !('user' in body)
   ) {
-    throw new Error('Invalid auth response body: expected accessToken and user');
+    throw new Error(
+      'Invalid auth response body: expected accessToken and user',
+    );
   }
 }
 
@@ -114,7 +116,9 @@ describe('Auth Critical E2E', () => {
   });
 
   it('nega acesso à rota protegida sem sessão/token', async () => {
-    const response = await request(app.getHttpServer()).get('/auth/me').expect(401);
+    const response = await request(app.getHttpServer())
+      .get('/auth/me')
+      .expect(401);
 
     expect(response.body).toHaveProperty('message');
   });

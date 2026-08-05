@@ -34,7 +34,9 @@ describe('AppService (Health)', () => {
   });
 
   it('retorna readiness ok quando DB e Redis estão saudáveis', async () => {
-    prismaService.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }] as never);
+    prismaService.$queryRawUnsafe.mockResolvedValue([
+      { '?column?': 1 },
+    ] as never);
     redisService.isHealthy.mockResolvedValue(true);
 
     const result = await service.getReadiness();
@@ -45,7 +47,9 @@ describe('AppService (Health)', () => {
   });
 
   it('retorna 503 quando Redis está indisponível', async () => {
-    prismaService.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }] as never);
+    prismaService.$queryRawUnsafe.mockResolvedValue([
+      { '?column?': 1 },
+    ] as never);
     redisService.isHealthy.mockResolvedValue(false);
 
     await expect(service.getReadiness()).rejects.toThrow(

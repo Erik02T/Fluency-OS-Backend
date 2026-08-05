@@ -9,7 +9,8 @@ export class RequestObservabilityMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
     const incomingRequestId = req.header('x-request-id');
     const requestId =
-      typeof incomingRequestId === 'string' && incomingRequestId.trim().length > 0
+      typeof incomingRequestId === 'string' &&
+      incomingRequestId.trim().length > 0
         ? incomingRequestId.trim()
         : randomUUID();
 

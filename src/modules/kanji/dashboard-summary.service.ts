@@ -68,7 +68,9 @@ export class DashboardSummaryService {
     const totalReviews = reviewStats._sum.totalReviews ?? 0;
     const correctReviews = reviewStats._sum.correctReviews ?? 0;
     const accuracyRate =
-      totalReviews > 0 ? Number(((correctReviews / totalReviews) * 100).toFixed(1)) : 0;
+      totalReviews > 0
+        ? Number(((correctReviews / totalReviews) * 100).toFixed(1))
+        : 0;
 
     return {
       kanjiStudied,

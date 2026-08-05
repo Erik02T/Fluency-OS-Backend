@@ -11,7 +11,11 @@ import { OptionalJwtMiddleware } from '../auth/middleware/optional-jwt.middlewar
 
 @Module({
   imports: [AuthModule],
-  controllers: [KanjiController, AdminKanjiController, DashboardSummaryController],
+  controllers: [
+    KanjiController,
+    AdminKanjiController,
+    DashboardSummaryController,
+  ],
   providers: [
     KanjiService,
     DashboardSummaryService,
