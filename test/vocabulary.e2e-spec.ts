@@ -13,6 +13,15 @@ interface LoginResponseBody {
   };
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+  };
+}
+
 function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
   if (
     typeof body !== 'object' ||
@@ -21,6 +30,19 @@ function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
     !('user' in body)
   ) {
     throw new Error('Invalid login response body');
+  }
+}
+
+function assertPaginatedBody<T>(
+  body: unknown,
+): asserts body is PaginatedResponse<T> {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('data' in body) ||
+    !Array.isArray((body as { data?: unknown }).data)
+  ) {
+    throw new Error('Invalid paginated response body');
   }
 }
 
@@ -120,12 +142,11 @@ describe('Vocabulary E2E', () => {
       )
       .expect(200);
 
+    assertPaginatedBody<{ id: string }>(response.body);
     expect(Array.isArray(response.body.data)).toBe(true);
-    expect(
-      (response.body.data as Array<{ id: string }>).some(
-        (item) => item.id === vocabularyId,
-      ),
-    ).toBe(true);
+    expect(response.body.data.some((item) => item.id === vocabularyId)).toBe(
+      true,
+    );
   });
 
   it('retorna detalhe real por id', async () => {

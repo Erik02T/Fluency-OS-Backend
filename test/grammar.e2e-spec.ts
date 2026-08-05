@@ -13,6 +13,21 @@ interface LoginResponseBody {
   };
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+  };
+}
+
+interface GrammarDetailResponse {
+  id: string;
+  pattern: string;
+  examples: Array<{ id: string; japanese: string; translation: string }>;
+}
+
 function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
   if (
     typeof body !== 'object' ||
@@ -21,6 +36,32 @@ function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
     !('user' in body)
   ) {
     throw new Error('Invalid login response body');
+  }
+}
+
+function assertPaginatedBody<T>(
+  body: unknown,
+): asserts body is PaginatedResponse<T> {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('data' in body) ||
+    !Array.isArray((body as { data?: unknown }).data)
+  ) {
+    throw new Error('Invalid paginated response body');
+  }
+}
+
+function assertGrammarDetail(
+  body: unknown,
+): asserts body is GrammarDetailResponse {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('examples' in body) ||
+    !Array.isArray((body as { examples?: unknown }).examples)
+  ) {
+    throw new Error('Invalid grammar detail response body');
   }
 }
 
@@ -116,12 +157,11 @@ describe('Grammar E2E', () => {
       )
       .expect(200);
 
+    assertPaginatedBody<{ id: string }>(response.body);
     expect(Array.isArray(response.body.data)).toBe(true);
-    expect(
-      (response.body.data as Array<{ id: string }>).some(
-        (item) => item.id === grammarPointId,
-      ),
-    ).toBe(true);
+    expect(response.body.data.some((item) => item.id === grammarPointId)).toBe(
+      true,
+    );
   });
 
   it('retorna detalhe real por id', async () => {
@@ -129,6 +169,7 @@ describe('Grammar E2E', () => {
       .get(`/grammar/${grammarPointId}`)
       .expect(200);
 
+    assertGrammarDetail(response.body);
     expect(response.body).toHaveProperty('id', grammarPointId);
     expect(response.body).toHaveProperty('pattern');
     expect(response.body).toHaveProperty('examples');

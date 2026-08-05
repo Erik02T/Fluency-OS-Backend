@@ -11,8 +11,14 @@ import { GrammarDetailEntity, GrammarListEntity } from './types/grammar.types';
 
 describe('GrammarService', () => {
   let service: GrammarService;
-  let grammarRepository: jest.Mocked<GrammarRepository>;
-  let userProgressRepository: jest.Mocked<UserGrammarProgressRepository>;
+
+  const grammarFindAllMock = jest.fn();
+  const grammarCountMock = jest.fn();
+  const grammarFindByIdFullMock = jest.fn();
+  const progressFindByUserAndGrammarPointMock = jest.fn();
+  const progressFindByUserAndGrammarPointsMock = jest.fn();
+  const progressCreateMock = jest.fn();
+  const progressUpdateMock = jest.fn();
 
   const filters: GrammarFiltersDto = {
     page: 1,
@@ -87,32 +93,31 @@ describe('GrammarService', () => {
         {
           provide: GrammarRepository,
           useValue: {
-            findAll: jest.fn(),
-            count: jest.fn(),
-            findByIdFull: jest.fn(),
+            findAll: grammarFindAllMock,
+            count: grammarCountMock,
+            findByIdFull: grammarFindByIdFullMock,
           },
         },
         {
           provide: UserGrammarProgressRepository,
           useValue: {
-            findByUserAndGrammarPoint: jest.fn(),
-            findByUserAndGrammarPoints: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
+            findByUserAndGrammarPoint: progressFindByUserAndGrammarPointMock,
+            findByUserAndGrammarPoints: progressFindByUserAndGrammarPointsMock,
+            create: progressCreateMock,
+            update: progressUpdateMock,
           },
         },
       ],
     }).compile();
 
     service = module.get(GrammarService);
-    grammarRepository = module.get(GrammarRepository);
-    userProgressRepository = module.get(UserGrammarProgressRepository);
+    jest.clearAllMocks();
   });
 
   it('should return paginated results with attached user progress', async () => {
-    grammarRepository.findAll.mockResolvedValue([mockGrammar]);
-    grammarRepository.count.mockResolvedValue(1);
-    userProgressRepository.findByUserAndGrammarPoints.mockResolvedValue(
+    grammarFindAllMock.mockResolvedValue([mockGrammar]);
+    grammarCountMock.mockResolvedValue(1);
+    progressFindByUserAndGrammarPointsMock.mockResolvedValue(
       new Map([[mockGrammar.id, mockProgress]]),
     );
 
@@ -124,10 +129,8 @@ describe('GrammarService', () => {
   });
 
   it('should return grammar detail with progress when item exists', async () => {
-    grammarRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndGrammarPoint.mockResolvedValue(
-      mockProgress,
-    );
+    grammarFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndGrammarPointMock.mockResolvedValue(mockProgress);
 
     const result = await service.findById('grammar-123', 'user-123');
 
@@ -138,7 +141,7 @@ describe('GrammarService', () => {
   });
 
   it('should throw NotFoundException when detail item is missing', async () => {
-    grammarRepository.findByIdFull.mockResolvedValue(null);
+    grammarFindByIdFullMock.mockResolvedValue(null);
 
     await expect(service.findById('missing-id')).rejects.toThrow(
       NotFoundException,
@@ -146,18 +149,15 @@ describe('GrammarService', () => {
   });
 
   it('should create progress on study when no progress exists', async () => {
-    grammarRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndGrammarPoint.mockResolvedValue(null);
-    userProgressRepository.create.mockResolvedValue(mockProgress);
+    grammarFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndGrammarPointMock.mockResolvedValue(null);
+    progressCreateMock.mockResolvedValue(mockProgress);
 
     const result = await service.updateProgress('user-123', 'grammar-123', {
       action: 'study',
     });
 
-    expect(userProgressRepository.create).toHaveBeenCalledWith(
-      'user-123',
-      'grammar-123',
-    );
+    expect(progressCreateMock).toHaveBeenCalledWith('user-123', 'grammar-123');
     expect(result.grammarPointId).toBe('grammar-123');
     expect(result.reviewCount).toBe(2);
   });
@@ -169,18 +169,16 @@ describe('GrammarService', () => {
       reviewCount: 3,
     };
 
-    grammarRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndGrammarPoint.mockResolvedValue(
-      mockProgress,
-    );
-    userProgressRepository.update.mockResolvedValue(reviewedProgress);
+    grammarFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndGrammarPointMock.mockResolvedValue(mockProgress);
+    progressUpdateMock.mockResolvedValue(reviewedProgress);
 
     const result = await service.updateProgress('user-123', 'grammar-123', {
       action: 'review',
       understood: true,
     });
 
-    expect(userProgressRepository.update).toHaveBeenCalled();
+    expect(progressUpdateMock).toHaveBeenCalled();
     expect(result.confidenceLevel).toBe(4);
     expect(result.reviewCount).toBe(3);
   });
@@ -192,18 +190,16 @@ describe('GrammarService', () => {
       reviewCount: 3,
     };
 
-    grammarRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndGrammarPoint.mockResolvedValue(
-      mockProgress,
-    );
-    userProgressRepository.update.mockResolvedValue(lowProgress);
+    grammarFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndGrammarPointMock.mockResolvedValue(mockProgress);
+    progressUpdateMock.mockResolvedValue(lowProgress);
 
     const result = await service.updateProgress('user-123', 'grammar-123', {
       action: 'review',
       understood: false,
     });
 
-    expect(userProgressRepository.update).toHaveBeenCalled();
+    expect(progressUpdateMock).toHaveBeenCalled();
     expect(result.confidenceLevel).toBe(2);
     expect(result.reviewCount).toBe(3);
   });

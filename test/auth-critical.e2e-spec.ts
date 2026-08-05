@@ -88,10 +88,11 @@ describe('Auth Critical E2E', () => {
   it('refresh de sessão com cookie válido', async () => {
     const response = await agent.post('/auth/refresh').send({}).expect(200);
 
+    assertAuthBody(response.body);
     expect(response.body).toHaveProperty('accessToken');
     expect(response.body.accessToken).toBeTruthy();
 
-    accessToken = response.body.accessToken as string;
+    accessToken = response.body.accessToken;
   });
 
   it('acessa rota protegida com sessão válida', async () => {
