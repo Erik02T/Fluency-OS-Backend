@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { JLPTLevel, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import { VocabularyFiltersDto } from '../dto';
 import {
@@ -45,7 +45,7 @@ export class VocabularyRepository {
     const where: Prisma.VocabularyWhereInput = {};
 
     if (filters.jlpt) {
-      where.jlptLevel = filters.jlpt as JLPTLevel;
+      where.jlptLevel = filters.jlpt;
     }
 
     if (filters.search) {

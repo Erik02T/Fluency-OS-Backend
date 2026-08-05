@@ -14,8 +14,14 @@ import {
 
 describe('VocabularyService', () => {
   let service: VocabularyService;
-  let vocabularyRepository: jest.Mocked<VocabularyRepository>;
-  let userProgressRepository: jest.Mocked<UserVocabularyProgressRepository>;
+
+  const vocabFindAllMock = jest.fn();
+  const vocabCountMock = jest.fn();
+  const vocabFindByIdFullMock = jest.fn();
+  const progressFindByUserAndVocabularyMock = jest.fn();
+  const progressFindByUserAndVocabulariesMock = jest.fn();
+  const progressCreateMock = jest.fn();
+  const progressUpdateMock = jest.fn();
 
   const filters: VocabularyFiltersDto = {
     page: 1,
@@ -101,32 +107,31 @@ describe('VocabularyService', () => {
         {
           provide: VocabularyRepository,
           useValue: {
-            findAll: jest.fn(),
-            count: jest.fn(),
-            findByIdFull: jest.fn(),
+            findAll: vocabFindAllMock,
+            count: vocabCountMock,
+            findByIdFull: vocabFindByIdFullMock,
           },
         },
         {
           provide: UserVocabularyProgressRepository,
           useValue: {
-            findByUserAndVocabulary: jest.fn(),
-            findByUserAndVocabularies: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
+            findByUserAndVocabulary: progressFindByUserAndVocabularyMock,
+            findByUserAndVocabularies: progressFindByUserAndVocabulariesMock,
+            create: progressCreateMock,
+            update: progressUpdateMock,
           },
         },
       ],
     }).compile();
 
     service = module.get(VocabularyService);
-    vocabularyRepository = module.get(VocabularyRepository);
-    userProgressRepository = module.get(UserVocabularyProgressRepository);
+    jest.clearAllMocks();
   });
 
   it('should return paginated results with attached user progress', async () => {
-    vocabularyRepository.findAll.mockResolvedValue([mockVocabulary]);
-    vocabularyRepository.count.mockResolvedValue(1);
-    userProgressRepository.findByUserAndVocabularies.mockResolvedValue(
+    vocabFindAllMock.mockResolvedValue([mockVocabulary]);
+    vocabCountMock.mockResolvedValue(1);
+    progressFindByUserAndVocabulariesMock.mockResolvedValue(
       new Map([[mockVocabulary.id, mockProgress]]),
     );
 
@@ -138,10 +143,8 @@ describe('VocabularyService', () => {
   });
 
   it('should return vocabulary detail with progress when item exists', async () => {
-    vocabularyRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndVocabulary.mockResolvedValue(
-      mockProgress,
-    );
+    vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndVocabularyMock.mockResolvedValue(mockProgress);
 
     const result = await service.findById('vocab-123', 'user-123');
 
@@ -151,7 +154,7 @@ describe('VocabularyService', () => {
   });
 
   it('should throw NotFoundException when detail item is missing', async () => {
-    vocabularyRepository.findByIdFull.mockResolvedValue(null);
+    vocabFindByIdFullMock.mockResolvedValue(null);
 
     await expect(service.findById('missing-id')).rejects.toThrow(
       NotFoundException,
@@ -159,18 +162,15 @@ describe('VocabularyService', () => {
   });
 
   it('should create progress on study when no progress exists', async () => {
-    vocabularyRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndVocabulary.mockResolvedValue(null);
-    userProgressRepository.create.mockResolvedValue(mockProgress);
+    vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndVocabularyMock.mockResolvedValue(null);
+    progressCreateMock.mockResolvedValue(mockProgress);
 
     const result = await service.updateProgress('user-123', 'vocab-123', {
       action: 'study',
     });
 
-    expect(userProgressRepository.create).toHaveBeenCalledWith(
-      'user-123',
-      'vocab-123',
-    );
+    expect(progressCreateMock).toHaveBeenCalledWith('user-123', 'vocab-123');
     expect(result.vocabularyId).toBe('vocab-123');
     expect(result.totalReviews).toBe(2);
   });
@@ -185,18 +185,16 @@ describe('VocabularyService', () => {
       lastReviewAt: new Date(),
     };
 
-    vocabularyRepository.findByIdFull.mockResolvedValue(detailFixture);
-    userProgressRepository.findByUserAndVocabulary.mockResolvedValue(
-      mockProgress,
-    );
-    userProgressRepository.update.mockResolvedValue(reviewedProgress);
+    vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndVocabularyMock.mockResolvedValue(mockProgress);
+    progressUpdateMock.mockResolvedValue(reviewedProgress);
 
     const result = await service.updateProgress('user-123', 'vocab-123', {
       action: 'review',
       correct: true,
     });
 
-    expect(userProgressRepository.update).toHaveBeenCalled();
+    expect(progressUpdateMock).toHaveBeenCalled();
     expect(result.srsLevel).toBe(4);
     expect(result.correctReviews).toBe(3);
   });
