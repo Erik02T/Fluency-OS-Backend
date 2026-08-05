@@ -15,6 +15,19 @@ interface LoginResponseBody {
   };
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    perPage: number;
+    total: number;
+  };
+}
+
+interface EntityWithId {
+  id: string;
+}
+
 function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
   if (
     typeof body !== 'object' ||
@@ -23,6 +36,31 @@ function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
     !('user' in body)
   ) {
     throw new Error('Invalid login response body');
+  }
+}
+
+function assertPaginatedBody<T>(
+  body: unknown,
+): asserts body is PaginatedResponse<T> {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('data' in body) ||
+    !('pagination' in body) ||
+    !Array.isArray((body as { data?: unknown }).data)
+  ) {
+    throw new Error('Invalid paginated response body');
+  }
+}
+
+function assertEntityWithId(body: unknown): asserts body is EntityWithId {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('id' in body) ||
+    typeof (body as { id?: unknown }).id !== 'string'
+  ) {
+    throw new Error('Invalid entity response body: missing id');
   }
 }
 
@@ -112,6 +150,7 @@ describe('Kanji Core E2E', () => {
       .get('/kanji?page=1&perPage=20')
       .expect(200);
 
+    assertPaginatedBody<{ id: string }>(response.body);
     expect(response.body).toHaveProperty('data');
     expect(response.body).toHaveProperty('pagination');
     expect(Array.isArray(response.body.data)).toBe(true);
@@ -145,11 +184,12 @@ describe('Kanji Core E2E', () => {
       })
       .expect(201);
 
+    assertEntityWithId(response.body);
     expect(response.body).toHaveProperty('id');
     expect(response.body).toHaveProperty('character', testCharacter);
     expect(response.body).toHaveProperty('jlpt', 'N2');
 
-    createdKanjiId = response.body.id as string;
+    createdKanjiId = response.body.id;
   });
 
   it('busca kanji por query e por filtro', async () => {
@@ -170,11 +210,10 @@ describe('Kanji Core E2E', () => {
       )
       .expect(200);
 
+    assertPaginatedBody<{ id: string }>(filterResponse.body);
     expect(Array.isArray(filterResponse.body.data)).toBe(true);
     expect(
-      (filterResponse.body.data as Array<{ id: string }>).some(
-        (kanji) => kanji.id === createdKanjiId,
-      ),
+      filterResponse.body.data.some((kanji) => kanji.id === createdKanjiId),
     ).toBe(true);
   });
 
@@ -207,7 +246,8 @@ describe('Kanji Core E2E', () => {
       })
       .expect(201);
 
-    const secondKanjiId = secondKanjiResponse.body.id as string;
+    assertEntityWithId(secondKanjiResponse.body);
+    const secondKanjiId = secondKanjiResponse.body.id;
 
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
