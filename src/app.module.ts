@@ -6,6 +6,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { KanjiModule } from './modules/kanji/kanji.module';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
+import { ImmersionModule } from './modules/immersion/immersion.module';
+import { PlannerModule } from './modules/planner/planner.module';
 import { CommonModule } from './common/common.module';
 import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 import { RequestObservabilityMiddleware } from './common/middleware/request-observability.middleware';
@@ -23,6 +25,8 @@ import { validateEnv } from './config/validation.schema';
     KanjiModule,
     VocabularyModule,
     GrammarModule,
+    ImmersionModule,
+    PlannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
