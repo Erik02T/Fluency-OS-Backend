@@ -3,7 +3,6 @@ import { PrismaService } from '../auth/repositories/prisma.service';
 import {
   PlannerHabitDto,
   PlannerOverviewResponseDto,
-  PlannerSummaryDto,
   PlannerTaskDto,
   PlannerTaskDomain,
   PlannerTaskPriority,
@@ -94,8 +93,6 @@ export class PlannerService {
       vocabReviewedWeek,
       reviewedWeek,
       totalGrammarCount,
-      totalKanjiActive,
-      totalVocabActive,
       streakRecord,
       todayReviewAnswers,
     ] = await Promise.all([
@@ -147,12 +144,6 @@ export class PlannerService {
         _sum: { totalReviews: true },
       }),
       this.prisma.grammarPoint.count(),
-      this.prisma.userKanjiProgress.count({
-        where: { userId },
-      }),
-      this.prisma.userVocabularyProgress.count({
-        where: { userId },
-      }),
       this.prisma.streak.findUnique({ where: { userId } }),
       this.prisma.reviewAnswer.count({
         where: {
@@ -162,7 +153,10 @@ export class PlannerService {
       }),
     ]);
 
-    const unstudiedGrammarCount = Math.max(0, totalGrammarCount - studiedGrammarCount);
+    const unstudiedGrammarCount = Math.max(
+      0,
+      totalGrammarCount - studiedGrammarCount,
+    );
 
     const immersionToday = todayImmersionMinutes._sum.durationMinutes ?? 0;
     const weekKanjiReviewed = kanjiReviewedWeek._sum.kanjiReviewed ?? 0;
@@ -177,9 +171,10 @@ export class PlannerService {
         id: `task-kanji-review-${userId}`,
         domain: 'kanji',
         task: `Revisar ${dueKanjiCount} kanji`,
-        description: dueKanjiCount >= 50
-          ? 'Fila grande, divida em blocos de 20 para manter o foco.'
-          : 'Revisões pendentes do SRS (SM-2).',
+        description:
+          dueKanjiCount >= 50
+            ? 'Fila grande, divida em blocos de 20 para manter o foco.'
+            : 'Revisões pendentes do SRS (SM-2).',
         priority: priorityByCount(dueKanjiCount),
         estimatedMinutes: Math.max(5, Math.round(dueKanjiCount * 0.5)),
         kanjiGlyph: '字',
@@ -193,9 +188,10 @@ export class PlannerService {
         id: `task-vocab-review-${userId}`,
         domain: 'vocabulary',
         task: `Aprender / revisar ${dueVocabCount} palavras novas`,
-        description: dueVocabCount >= 50
-          ? 'Fila grande de vocabulário. Priorize palavras de alta frequência.'
-          : 'Vocabulários pendentes no SRS.',
+        description:
+          dueVocabCount >= 50
+            ? 'Fila grande de vocabulário. Priorize palavras de alta frequência.'
+            : 'Vocabulários pendentes no SRS.',
         priority: priorityByCount(dueVocabCount),
         estimatedMinutes: Math.max(10, Math.round(dueVocabCount * 2)),
         kanjiGlyph: '語',
@@ -209,14 +205,18 @@ export class PlannerService {
         id: `task-grammar-study-${userId}`,
         domain: 'grammar',
         task: 'Estudar 1 ponto gramatical novo',
-        description: unstudiedGrammarCount > 100
-          ? `Restam ${unstudiedGrammarCount} pontos. Continue de onde parou.`
-          : `Resta(m) ${unstudiedGrammarCount} ponto(s) gramatical(is) não estudado(s).`,
+        description:
+          unstudiedGrammarCount > 100
+            ? `Restam ${unstudiedGrammarCount} pontos. Continue de onde parou.`
+            : `Resta(m) ${unstudiedGrammarCount} ponto(s) gramatical(is) não estudado(s).`,
         priority: 'medium',
         estimatedMinutes: 25,
         kanjiGlyph: '文',
         dueAt: now.toISOString(),
-        action: { type: 'study_grammar', count: Math.max(1, Math.min(unstudiedGrammarCount, 5)) },
+        action: {
+          type: 'study_grammar',
+          count: Math.max(1, Math.min(unstudiedGrammarCount, 5)),
+        },
       });
     }
 
@@ -227,9 +227,10 @@ export class PlannerService {
         id: `task-immersion-${userId}`,
         domain: 'immersion',
         task: 'Assistir 1 episódio de anime (ou equivalente)',
-        description: immersionToday === 0
-          ? 'Nenhuma imersão registrada hoje. 30 minutos mínimos recomendados.'
-          : `Faltam ${remaining} minutos para bater a meta diária.`,
+        description:
+          immersionToday === 0
+            ? 'Nenhuma imersão registrada hoje. 30 minutos mínimos recomendados.'
+            : `Faltam ${remaining} minutos para bater a meta diária.`,
         priority: immersionToday === 0 ? 'medium' : 'low',
         estimatedMinutes: Math.min(30, Math.max(remaining, 24)),
         kanjiGlyph: '映',
@@ -259,8 +260,7 @@ export class PlannerService {
 
     const tasksCompletedToday = 0;
     const tasksTotalToday = todayTasks.length;
-    const studyMinutesToday =
-      todayReviewAnswers * 1 + immersionToday;
+    const studyMinutesToday = todayReviewAnswers * 1 + immersionToday;
 
     const currentStreak = streakRecord?.currentStreak ?? 0;
     const longestStreak = streakRecord?.longestStreak ?? 0;
@@ -306,9 +306,20 @@ export class PlannerService {
         currentStreak,
         async (dayStart, dayEnd) => {
           const reviews = await this.prisma.reviewAnswer.count({
-            where: { session: { userId }, answeredAt: { gte: dayStart, lte: dayEnd } },
+            where: {
+              session: { userId },
+              answeredAt: { gte: dayStart, lte: dayEnd },
+            },
           });
-          return { completed: reviews >= 10, weeklyProgress: weekGrammarReviews + weekKanjiReviewed + weekVocabReviewed, target: Math.max(350, weekGrammarReviews + weekKanjiReviewed + weekVocabReviewed + 100) };
+          return {
+            completed: reviews >= 10,
+            weeklyProgress:
+              weekGrammarReviews + weekKanjiReviewed + weekVocabReviewed,
+            target: Math.max(
+              350,
+              weekGrammarReviews + weekKanjiReviewed + weekVocabReviewed + 100,
+            ),
+          };
         },
       ),
       this.buildHabit(
@@ -326,7 +337,11 @@ export class PlannerService {
               answeredAt: { gte: dayStart, lte: dayEnd },
             },
           });
-          return { completed: count >= 5, weeklyProgress: weekKanjiReviewed, target: Math.max(200, weekKanjiReviewed + 60) };
+          return {
+            completed: count >= 5,
+            weeklyProgress: weekKanjiReviewed,
+            target: Math.max(200, weekKanjiReviewed + 60),
+          };
         },
       ),
       this.buildHabit(
@@ -346,7 +361,11 @@ export class PlannerService {
             _sum: { durationMinutes: true },
           });
           const total = aggregate._sum.durationMinutes ?? 0;
-          return { completed: total >= 30, weeklyProgress: weekImmersion, target: Math.max(300, weekImmersion + 120) };
+          return {
+            completed: total >= 30,
+            weeklyProgress: weekImmersion,
+            target: Math.max(300, weekImmersion + 120),
+          };
         },
       ),
       this.buildHabit(
@@ -364,7 +383,11 @@ export class PlannerService {
               studiedAt: { gte: dayStart, lte: dayEnd },
             },
           });
-          return { completed: studied >= 1, weeklyProgress: weekGrammarReviews, target: Math.max(350, weekGrammarReviews + 100) };
+          return {
+            completed: studied >= 1,
+            weeklyProgress: weekGrammarReviews,
+            target: Math.max(350, weekGrammarReviews + 100),
+          };
         },
       ),
     ]);
@@ -395,7 +418,11 @@ export class PlannerService {
     resolver: (
       dayStart: Date,
       dayEnd: Date,
-    ) => Promise<{ completed: boolean; weeklyProgress: number; target: number }>,
+    ) => Promise<{
+      completed: boolean;
+      weeklyProgress: number;
+      target: number;
+    }>,
   ): Promise<PlannerHabitDto> {
     void userId;
     const completedThisWeek: boolean[] = [];

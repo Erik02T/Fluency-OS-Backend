@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { OptionalJwtMiddleware } from '../auth/middleware/optional-jwt.middleware';
 import { PrismaService } from '../auth/repositories/prisma.service';
 import { GrammarController } from './grammar.controller';
+import { AdminGrammarController } from './admin-grammar.controller';
 import { GrammarService } from './grammar.service';
 import {
   GrammarRepository,
@@ -11,7 +12,7 @@ import {
 
 @Module({
   imports: [AuthModule],
-  controllers: [GrammarController],
+  controllers: [GrammarController, AdminGrammarController],
   providers: [
     GrammarService,
     GrammarRepository,

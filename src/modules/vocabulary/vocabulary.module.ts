@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { OptionalJwtMiddleware } from '../auth/middleware/optional-jwt.middleware';
 import { PrismaService } from '../auth/repositories/prisma.service';
 import { VocabularyController } from './vocabulary.controller';
+import { AdminVocabularyController } from './admin-vocabulary.controller';
 import { VocabularyService } from './vocabulary.service';
 import {
   UserVocabularyProgressRepository,
@@ -11,7 +12,7 @@ import {
 
 @Module({
   imports: [AuthModule],
-  controllers: [VocabularyController],
+  controllers: [VocabularyController, AdminVocabularyController],
   providers: [
     VocabularyService,
     VocabularyRepository,

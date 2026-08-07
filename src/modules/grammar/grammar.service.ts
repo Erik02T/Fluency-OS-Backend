@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  CreateGrammarPointDto,
   UpdateGrammarProgressDto,
   GrammarDetailResponseDto,
   PaginatedGrammarResponseDto,
   GrammarFiltersDto,
   GrammarListResponseDto,
   GrammarProgressResponseDto,
+  UpdateGrammarPointDto,
 } from './dto';
 import {
   GrammarRepository,
@@ -17,6 +23,7 @@ import {
   GrammarDetailEntity,
   GrammarListInput,
 } from './types/grammar.types';
+import { logStructured } from '../../common/logging/structured-log';
 
 @Injectable()
 export class GrammarService {
@@ -74,6 +81,91 @@ export class GrammarService {
       : null;
 
     return this.toDetailDto(grammarPoint, progress);
+  }
+
+  async createAdminGrammarPoint(
+    dto: CreateGrammarPointDto,
+  ): Promise<GrammarDetailResponseDto> {
+    logStructured('info', 'GrammarService', 'grammar.admin.create.start', {
+      pattern: dto.pattern,
+      jlptLevel: dto.jlptLevel,
+    });
+
+    const existing = await this.grammarRepository.findByPatternAndJlpt(
+      dto.pattern,
+      dto.jlptLevel,
+    );
+
+    if (existing) {
+      throw new ConflictException(
+        `Grammar point '${dto.pattern}' already exists for JLPT ${dto.jlptLevel}`,
+      );
+    }
+
+    const grammarPoint =
+      await this.grammarRepository.createAdminGrammarPoint(dto);
+
+    logStructured('info', 'GrammarService', 'grammar.admin.create.success', {
+      grammarPointId: grammarPoint.id,
+      pattern: grammarPoint.pattern,
+    });
+
+    return this.toDetailDto(grammarPoint);
+  }
+
+  async updateAdminGrammarPoint(
+    id: string,
+    dto: UpdateGrammarPointDto,
+  ): Promise<GrammarDetailResponseDto> {
+    logStructured('info', 'GrammarService', 'grammar.admin.update.start', {
+      grammarPointId: id,
+      payloadKeys: Object.keys(dto),
+    });
+
+    if (dto.pattern !== undefined && dto.jlptLevel !== undefined) {
+      const existing = await this.grammarRepository.findByPatternAndJlpt(
+        dto.pattern,
+        dto.jlptLevel,
+      );
+
+      if (existing && existing.id !== id) {
+        throw new ConflictException(
+          `Grammar point '${dto.pattern}' already exists for JLPT ${dto.jlptLevel}`,
+        );
+      }
+    }
+
+    const grammarPoint = await this.grammarRepository.updateAdminGrammarPoint(
+      id,
+      dto,
+    );
+
+    if (!grammarPoint) {
+      throw new NotFoundException(`Grammar point with id ${id} not found`);
+    }
+
+    logStructured('info', 'GrammarService', 'grammar.admin.update.success', {
+      grammarPointId: id,
+      pattern: grammarPoint.pattern,
+    });
+
+    return this.toDetailDto(grammarPoint);
+  }
+
+  async deleteAdminGrammarPoint(id: string): Promise<void> {
+    logStructured('info', 'GrammarService', 'grammar.admin.delete.start', {
+      grammarPointId: id,
+    });
+
+    const deleted = await this.grammarRepository.deleteAdminGrammarPoint(id);
+
+    if (!deleted) {
+      throw new NotFoundException(`Grammar point with id ${id} not found`);
+    }
+
+    logStructured('info', 'GrammarService', 'grammar.admin.delete.success', {
+      grammarPointId: id,
+    });
   }
 
   async updateProgress(
