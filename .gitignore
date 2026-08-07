@@ -4,6 +4,9 @@ node_modules
 
 /generated/prisma
 
+# Ignore raw datasets (large JSON/XML dumps, download separately from official releases)
+data/
+
 # Ignore log files and directories
 logs/
 *.log
@@ -13,3 +16,6 @@ dist/
 
 # Ignore dependency directories
 node_modules/
+
+# Ignore test coverage output
+coverage/

@@ -18,6 +18,7 @@ import {
   KanjiListInput,
   UserKanjiProgressEntity,
 } from './types/kanji.types';
+import { logStructured } from '../../common/logging/structured-log';
 
 @Injectable()
 export class KanjiService {
@@ -36,6 +37,11 @@ export class KanjiService {
     filters: KanjiFiltersDto,
     userId?: string,
   ): Promise<PaginatedKanjiResponseDto> {
+    logStructured('info', 'KanjiService', 'kanji.findAll.start', {
+      userId,
+      filters,
+    });
+
     const kanjis = await this.kanjiRepository.findAll(filters, userId);
     const total = await this.kanjiRepository.count(filters, userId);
 
@@ -68,6 +74,11 @@ export class KanjiService {
    * @returns KanjiDetailResponseDto
    */
   async findById(id: string, userId?: string): Promise<KanjiDetailResponseDto> {
+    logStructured('info', 'KanjiService', 'kanji.findById.start', {
+      kanjiId: id,
+      userId,
+    });
+
     const kanji = await this.kanjiRepository.findByIdFull(id);
 
     if (!kanji) {
@@ -123,6 +134,12 @@ export class KanjiService {
     userId?: string,
     limit?: number,
   ): Promise<KanjiListResponseDto[]> {
+    logStructured('info', 'KanjiService', 'kanji.search.start', {
+      query,
+      userId,
+      limit,
+    });
+
     const kanjis = await this.kanjiRepository.search(query, limit);
 
     let progressMap = new Map<string, UserKanjiProgressEntity>();
@@ -138,6 +155,11 @@ export class KanjiService {
   }
 
   async createAdminKanji(dto: CreateKanjiDto): Promise<KanjiDetailResponseDto> {
+    logStructured('info', 'KanjiService', 'kanji.admin.create.start', {
+      character: dto.character,
+      jlptLevel: dto.jlptLevel,
+    });
+
     const existingKanji = await this.kanjiRepository.findByCharacter(
       dto.character,
     );
@@ -148,6 +170,11 @@ export class KanjiService {
 
     const kanji = await this.kanjiRepository.createAdminKanji(dto);
 
+    logStructured('info', 'KanjiService', 'kanji.admin.create.success', {
+      kanjiId: kanji.id,
+      character: kanji.character,
+    });
+
     return this.toDetailDto(kanji);
   }
 
@@ -155,6 +182,11 @@ export class KanjiService {
     id: string,
     dto: UpdateKanjiDto,
   ): Promise<KanjiDetailResponseDto> {
+    logStructured('info', 'KanjiService', 'kanji.admin.update.start', {
+      kanjiId: id,
+      payloadKeys: Object.keys(dto),
+    });
+
     if (dto.character) {
       const existingKanji = await this.kanjiRepository.findByCharacter(
         dto.character,
@@ -171,15 +203,28 @@ export class KanjiService {
       throw new NotFoundException(`Kanji with id ${id} not found`);
     }
 
+    logStructured('info', 'KanjiService', 'kanji.admin.update.success', {
+      kanjiId: id,
+      character: kanji.character,
+    });
+
     return this.toDetailDto(kanji);
   }
 
   async deleteAdminKanji(id: string): Promise<void> {
+    logStructured('info', 'KanjiService', 'kanji.admin.delete.start', {
+      kanjiId: id,
+    });
+
     const deleted = await this.kanjiRepository.deleteAdminKanji(id);
 
     if (!deleted) {
       throw new NotFoundException(`Kanji with id ${id} not found`);
     }
+
+    logStructured('info', 'KanjiService', 'kanji.admin.delete.success', {
+      kanjiId: id,
+    });
   }
 
   /**

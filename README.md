@@ -63,6 +63,18 @@ Este repositório contém o **backend** da plataforma, responsável por toda a l
 
 > Detalhamento completo de cada fase em [Roadmap](#-roadmap). Atualize esta tabela conforme o time avança — ela reflete o estado real do repositório, não o plano original.
 
+## 🧭 Revisão contínua da documentação por release
+
+Para manter documentação e código alinhados, cada release deve executar esta revisão curta:
+
+1. Conferir módulos ativos em src/app.module.ts.
+2. Conferir controllers e rotas realmente existentes nos módulos ativos.
+3. Atualizar docs/api.md com três blocos explícitos: Implementado, Em desenvolvimento e Planejado/Futuro.
+4. Atualizar fluency-os-backend-spec.md com o snapshot de status operacional da release.
+5. Proibir que uma rota apareça como ativa na documentação sem existir em controller ativo.
+
+Esse processo é obrigatório para evitar divergência entre visão de produto e estado real do backend.
+
 ## 🏗 Arquitetura
 
 O backend segue uma arquitetura modular do NestJS, organizada por domínio (feature module), com clara separação entre **controllers**, **services** e **repositories**, orientação a eventos para automações e suporte nativo a tempo real.

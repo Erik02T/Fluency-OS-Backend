@@ -12,6 +12,9 @@ import { CreateUserDto, LoginDto, AuthResponseDto } from './dto';
 import { UserRepository } from './repositories/user.repository';
 import { RedisService } from '../../common/services/redis.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { logStructured } from '../../common/logging/structured-log';
+
+type AuthSessionPayload = AuthResponseDto & { refreshToken: string };
 
 @Injectable()
 export class AuthService {
@@ -29,7 +32,11 @@ export class AuthService {
    * @param dto CreateUserDto com email, password, name
    * @returns AuthResponseDto com tokens
    */
-  async register(dto: CreateUserDto): Promise<AuthResponseDto> {
+  async register(dto: CreateUserDto): Promise<AuthSessionPayload> {
+    logStructured('info', 'AuthService', 'auth.register.start', {
+      email: dto.email,
+    });
+
     // Validar se email já existe
     const existingUser = await this.userRepository.findByEmail(dto.email);
     if (existingUser) {
@@ -60,6 +67,11 @@ export class AuthService {
         user: this.userRepository.sanitizeUser(user),
       };
     } catch (error) {
+      logStructured('error', 'AuthService', 'auth.register.error', {
+        email: dto.email,
+        message: error instanceof Error ? error.message : String(error),
+      });
+
       this.logger.error(
         `Failed to register user: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -72,7 +84,11 @@ export class AuthService {
    * @param dto LoginDto com email e password
    * @returns AuthResponseDto com tokens
    */
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthSessionPayload> {
+    logStructured('info', 'AuthService', 'auth.login.start', {
+      email: dto.email,
+    });
+
     // Buscar usuário
     const user = await this.userRepository.findByEmail(dto.email);
     if (!user) {
@@ -96,6 +112,11 @@ export class AuthService {
     // Gerar tokens
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
+    logStructured('info', 'AuthService', 'auth.login.success', {
+      userId: user.id,
+      role: user.role,
+    });
+
     return {
       ...tokens,
       user: this.userRepository.sanitizeUser(user),
@@ -108,6 +129,10 @@ export class AuthService {
    * @returns Novo access token
    */
   async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
+    logStructured('info', 'AuthService', 'auth.refresh.start', {
+      hasRefreshToken: Boolean(refreshToken),
+    });
+
     // Validar formato de UUID
     if (!this.isValidUUID(refreshToken)) {
       throw new UnauthorizedException('Invalid refresh token format');
@@ -139,6 +164,10 @@ export class AuthService {
       expiresIn: this.configService.get('JWT_EXPIRATION') || '15m',
     });
 
+    logStructured('info', 'AuthService', 'auth.refresh.success', {
+      userId: user.id,
+    });
+
     return { accessToken };
   }
 
@@ -147,6 +176,10 @@ export class AuthService {
    * @param refreshToken Refresh token a invalidar
    */
   async logout(refreshToken: string): Promise<void> {
+    logStructured('info', 'AuthService', 'auth.logout.start', {
+      hasRefreshToken: Boolean(refreshToken),
+    });
+
     if (!this.isValidUUID(refreshToken)) {
       throw new UnauthorizedException('Invalid refresh token format');
     }
@@ -161,6 +194,10 @@ export class AuthService {
         storedUserId,
         refreshToken,
       );
+
+      logStructured('info', 'AuthService', 'auth.logout.success', {
+        userId: storedUserId,
+      });
     }
   }
 

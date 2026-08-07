@@ -43,7 +43,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `Failed to connect to Redis: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw error;
+      // Não interrompe o bootstrap da API: readiness reportará degradação (503).
     }
   }
 
@@ -52,8 +52,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async onModuleDestroy() {
     if (this.client) {
-      await this.client.quit();
-      this.logger.log('Redis disconnected');
+      try {
+        await this.client.quit();
+        this.logger.log('Redis disconnected');
+      } catch (error) {
+        this.logger.error(
+          `Failed to disconnect Redis: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 

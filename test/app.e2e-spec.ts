@@ -10,7 +10,6 @@ interface AuthUserBody {
 
 interface AuthTokensBody {
   accessToken: string;
-  refreshToken: string;
   user: AuthUserBody;
 }
 
@@ -32,7 +31,6 @@ function parseAuthTokensBody(body: unknown): AuthTokensBody {
     typeof body !== 'object' ||
     body === null ||
     !('accessToken' in body) ||
-    !('refreshToken' in body) ||
     !('user' in body)
   ) {
     throw new Error('Invalid auth tokens response body');
@@ -72,7 +70,7 @@ function parseKanjiListBody(body: unknown): KanjiListBody {
 
 describe('Auth E2E Tests', () => {
   let app: INestApplication<App>;
-  let refreshToken: string;
+  let authAgent: ReturnType<typeof request.agent>;
   const testEmail = `test-${Date.now()}@example.com`;
   const testPassword = 'SecurePass123';
 
@@ -92,6 +90,7 @@ describe('Auth E2E Tests', () => {
     );
 
     await app.init();
+    authAgent = request.agent(app.getHttpServer());
   });
 
   afterAll(async () => {
@@ -100,7 +99,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/register', () => {
     it('should register a new user', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await authAgent
         .post('/auth/register')
         .send({
           email: testEmail,
@@ -112,10 +111,9 @@ describe('Auth E2E Tests', () => {
       const body = parseAuthTokensBody(response.body);
 
       expect(body.accessToken).toBeDefined();
-      expect(body.refreshToken).toBeDefined();
+      expect(body).not.toHaveProperty('refreshToken');
+      expect(response.headers['set-cookie']).toBeDefined();
       expect(body.user.email).toBe(testEmail);
-
-      refreshToken = body.refreshToken;
     });
 
     it('should reject duplicate email', async () => {
@@ -146,7 +144,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/login', () => {
     it('should login with valid credentials', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await authAgent
         .post('/auth/login')
         .send({
           email: testEmail,
@@ -157,7 +155,8 @@ describe('Auth E2E Tests', () => {
       const body = parseAuthTokensBody(response.body);
 
       expect(body.accessToken).toBeDefined();
-      expect(body.refreshToken).toBeDefined();
+      expect(body).not.toHaveProperty('refreshToken');
+      expect(response.headers['set-cookie']).toBeDefined();
       expect(body.user.email).toBe(testEmail);
     });
 
@@ -184,12 +183,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/refresh', () => {
     it('should refresh access token', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/auth/refresh')
-        .send({
-          refreshToken,
-        })
-        .expect(200);
+      const response = await authAgent.post('/auth/refresh').expect(200);
 
       const body = parseRefreshTokenBody(response.body);
       expect(body.accessToken).toBeTruthy();
@@ -207,12 +201,7 @@ describe('Auth E2E Tests', () => {
 
   describe('POST /auth/logout', () => {
     it('should logout user', async () => {
-      await request(app.getHttpServer())
-        .post('/auth/logout')
-        .send({
-          refreshToken,
-        })
-        .expect(200);
+      await authAgent.post('/auth/logout').expect(200);
     });
   });
 });

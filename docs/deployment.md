@@ -62,9 +62,24 @@ Pipeline recomendado por push/PR em `main`:
 
 ## Observabilidade
 
-**Logs** — Winston + pino, JSON estruturado, níveis `error/warn/info/debug`, destino `stdout` + arquivo rotativo.
+**Logs** — JSON estruturado em `stdout/stderr` com `requestId` para correlação ponta a ponta.
+
+Exemplo real de linha de log HTTP:
+
+```json
+{"timestamp":"2026-08-03T23:10:12.120Z","level":"info","context":"HttpRequest","event":"request.completed","requestId":"9d45889f-7b3f-4df2-bf9f-ec5dd1eb71f5","method":"POST","path":"/auth/login","statusCode":200,"durationMs":47}
+```
+
+Exemplo real de log de domínio (Auth/Kanji):
+
+```json
+{"timestamp":"2026-08-03T23:10:12.113Z","level":"info","context":"AuthService","event":"auth.login.success","requestId":"9d45889f-7b3f-4df2-bf9f-ec5dd1eb71f5","userId":"cmef...","role":"ADMIN"}
+```
+
+Para rastrear uma requisição completa, filtre por `requestId` no agregador de logs.
 
 **Métricas** — `prom-client` (Prometheus), expostas em `GET /metrics`:
+
 - `http_requests_total` (por rota e status)
 - `http_request_duration_seconds`
 - `review_sessions_total`
@@ -72,13 +87,42 @@ Pipeline recomendado por push/PR em `main`:
 - `srs_queue_size_gauge`
 
 **Health checks**
+
 ```
-GET /health        → { status: "ok", database: "ok", redis: "ok" }
-GET /health/live    → liveness probe (Kubernetes)
-GET /health/ready   → readiness probe
+GET /health       → readiness consolidado (DB + Redis)
+GET /health/live  → liveness probe (processo vivo)
+GET /health/ready → readiness probe (DB + Redis)
+```
+
+Contratos:
+
+- `GET /health/live` retorna `200` quando o processo está vivo.
+- `GET /health` e `GET /health/ready` retornam:
+- `200` quando `database=ok` e `redis=ok`
+- `503` quando qualquer dependência está indisponível
+
+Exemplo `200`:
+
+```json
+{"status":"ok","database":"ok","redis":"ok","timestamp":"2026-08-03T23:10:12.100Z"}
+```
+
+Exemplo `503`:
+
+```json
+{"status":"degraded","database":"down","redis":"ok","timestamp":"2026-08-03T23:10:12.100Z"}
+```
+
+Checks rápidos:
+
+```bash
+curl -i http://localhost:3001/health/live
+curl -i http://localhost:3001/health
+curl -i http://localhost:3001/health/ready
 ```
 
 **Alertas (Grafana)**
+
 - Error rate > 1% por 5 minutos
 - P95 latency > 500ms
 - Pool de conexões do banco > 80%

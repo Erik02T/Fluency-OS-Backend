@@ -33,6 +33,10 @@ async function bootstrap() {
     )
     .addTag('Auth', 'Autenticação e gerenciamento de usuários')
     .addTag('Kanji', 'Banco de Kanji com filtros e busca')
+    .addTag(
+      'Vocabulary',
+      'Banco de vocabulário com filtros, detalhe e progresso',
+    )
     .addTag('Health', 'Status da aplicação')
     .build();
 
