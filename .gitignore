@@ -6,6 +6,9 @@ node_modules
 
 # Ignore raw datasets (large JSON/XML dumps, download separately from official releases)
 data/
+prisma/seed/vocabulary/raw/*.json
+prisma/seed/vocabulary/raw/*.xml
+prisma/seed/vocabulary/normalized/*.json
 
 # Ignore log files and directories
 logs/

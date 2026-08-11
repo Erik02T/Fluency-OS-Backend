@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  CreateVocabularyDto,
   UpdateVocabularyProgressDto,
   VocabularyDetailResponseDto,
   PaginatedVocabularyResponseDto,
   VocabularyFiltersDto,
   VocabularyListResponseDto,
   VocabularyProgressResponseDto,
+  UpdateVocabularyDto,
 } from './dto';
 import {
   UserVocabularyProgressRepository,
@@ -17,6 +23,7 @@ import {
   VocabularyDetailEntity,
   VocabularyListInput,
 } from './types/vocabulary.types';
+import { logStructured } from '../../common/logging/structured-log';
 
 @Injectable()
 export class VocabularyService {
@@ -74,6 +81,122 @@ export class VocabularyService {
       : null;
 
     return this.toDetailDto(vocabulary, progress);
+  }
+
+  async createAdminVocabulary(
+    dto: CreateVocabularyDto,
+  ): Promise<VocabularyDetailResponseDto> {
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.create.start',
+      {
+        word: dto.word,
+        reading: dto.reading,
+        jlptLevel: dto.jlptLevel,
+      },
+    );
+
+    const existing = await this.vocabularyRepository.findByWordAndReading(
+      dto.word,
+      dto.reading,
+    );
+
+    if (existing) {
+      throw new ConflictException(
+        `Vocabulary '${dto.word}' (${dto.reading}) already exists`,
+      );
+    }
+
+    const vocabulary =
+      await this.vocabularyRepository.createAdminVocabulary(dto);
+
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.create.success',
+      {
+        vocabularyId: vocabulary.id,
+        word: vocabulary.word,
+      },
+    );
+
+    return this.toDetailDto(vocabulary);
+  }
+
+  async updateAdminVocabulary(
+    id: string,
+    dto: UpdateVocabularyDto,
+  ): Promise<VocabularyDetailResponseDto> {
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.update.start',
+      {
+        vocabularyId: id,
+        payloadKeys: Object.keys(dto),
+      },
+    );
+
+    if (dto.word !== undefined && dto.reading !== undefined) {
+      const existing = await this.vocabularyRepository.findByWordAndReading(
+        dto.word,
+        dto.reading,
+      );
+
+      if (existing && existing.id !== id) {
+        throw new ConflictException(
+          `Vocabulary '${dto.word}' (${dto.reading}) already exists`,
+        );
+      }
+    }
+
+    const vocabulary = await this.vocabularyRepository.updateAdminVocabulary(
+      id,
+      dto,
+    );
+
+    if (!vocabulary) {
+      throw new NotFoundException(`Vocabulary with id ${id} not found`);
+    }
+
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.update.success',
+      {
+        vocabularyId: id,
+        word: vocabulary.word,
+      },
+    );
+
+    return this.toDetailDto(vocabulary);
+  }
+
+  async deleteAdminVocabulary(id: string): Promise<void> {
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.delete.start',
+      {
+        vocabularyId: id,
+      },
+    );
+
+    const deleted = await this.vocabularyRepository.deleteAdminVocabulary(id);
+
+    if (!deleted) {
+      throw new NotFoundException(`Vocabulary with id ${id} not found`);
+    }
+
+    logStructured(
+      'info',
+      'VocabularyService',
+      'vocabulary.admin.delete.success',
+      {
+        vocabularyId: id,
+      },
+    );
   }
 
   async updateProgress(
