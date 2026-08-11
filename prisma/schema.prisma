@@ -344,16 +344,16 @@ model UserKanjiProgress {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model Vocabulary {
-  id           String    @id @default(cuid())
-  word         String    @db.VarChar(100)
-  reading      String    @db.VarChar(200) // leitura em hiragana/katakana
-  jlptLevel    JLPTLevel
+  id           String     @id @default(cuid())
+  word         String     @db.VarChar(100)
+  reading      String     @db.VarChar(200) // leitura em hiragana/katakana
+  jlptLevel    JLPTLevel? // nullable — não inventamos JLPT, preenchemos apenas com fonte confiável
   frequency    Int?
-  partOfSpeech String?   @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
-  tags         String[]  // categorias: ["daily", "formal", "anime", "business"]
-  notes        String?   @db.Text
-  audioUrl     String?   @db.Text
-  createdAt    DateTime  @default(now())
+  partOfSpeech String?    @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
+  tags         String[]   // categorias: ["daily", "formal", "anime", "business"]
+  notes        String?    @db.Text
+  audioUrl     String?    @db.Text
+  createdAt    DateTime   @default(now())
 
   meanings        VocabularyMeaning[]
   examples        VocabularyExample[]
