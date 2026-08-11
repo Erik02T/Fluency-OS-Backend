@@ -69,9 +69,10 @@ export class CreateVocabularyDto {
   @IsNotEmpty()
   reading!: string;
 
-  @ApiProperty({ enum: JLPTLevel, example: JLPTLevel.N5 })
+  @ApiProperty({ enum: JLPTLevel, example: JLPTLevel.N5, nullable: true })
+  @IsOptional()
   @IsEnum(JLPTLevel)
-  jlptLevel!: JLPTLevel;
+  jlptLevel?: JLPTLevel | null;
 
   @ApiPropertyOptional({ example: 500 })
   @IsOptional()
