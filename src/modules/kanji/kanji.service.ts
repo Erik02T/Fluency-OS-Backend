@@ -12,6 +12,8 @@ import {
   KanjiDetailResponseDto,
   PaginatedKanjiResponseDto,
   UpdateKanjiDto,
+  UpdateKanjiProgressDto,
+  KanjiProgressResponseDto,
 } from './dto';
 import {
   KanjiDetailEntity,
@@ -236,6 +238,49 @@ export class KanjiService {
     return Promise.resolve({});
   }
 
+  /**
+   * Atualizar progresso de kanji (estudar ou enviar para review)
+   * @param userId ID do usuário
+   * @param kanjiId ID do kanji
+   * @param dto DTO com action
+   * @returns KanjiProgressResponseDto
+   */
+  async updateProgress(
+    userId: string,
+    kanjiId: string,
+    dto: UpdateKanjiProgressDto,
+  ): Promise<KanjiProgressResponseDto> {
+    const kanji = await this.kanjiRepository.findByIdFull(kanjiId);
+
+    if (!kanji) {
+      throw new NotFoundException(`Kanji with id ${kanjiId} not found`);
+    }
+
+    let progress = await this.userProgressRepository.findByUserAndKanji(
+      userId,
+      kanjiId,
+    );
+
+    if (dto.action === 'study') {
+      progress = await this.userProgressRepository.upsert(userId, kanjiId);
+      return this.toProgressDto(kanjiId, progress);
+    }
+
+    // action === 'review'
+    // O item entra na fila IMEDIATAMENTE (nextReviewAt = now) para que
+    // apareça na fila de revisão sem esperar o próximo agendamento.
+    if (!progress) {
+      progress = await this.userProgressRepository.upsert(userId, kanjiId);
+    }
+
+    // Força a próxima revisão para agora para que o item apareça na fila.
+    progress = await this.userProgressRepository.update(userId, kanjiId, {
+      nextReviewAt: new Date(),
+    });
+
+    return this.toProgressDto(kanjiId, progress);
+  }
+
   private toListDto(
     kanji: KanjiListInput,
     progressMap: Map<string, UserKanjiProgressEntity>,
@@ -345,6 +390,27 @@ export class KanjiService {
             streak: 0,
           }
         : undefined,
+    };
+  }
+
+  private toProgressDto(
+    kanjiId: string,
+    progress: UserKanjiProgressEntity,
+  ): KanjiProgressResponseDto {
+    return {
+      kanjiId,
+      srsLevel: progress.srsLevel,
+      isMastered: progress.isMastered,
+      isFavorited: progress.isFavorite,
+      isSuspended: progress.isSuspended,
+      easeFactor: progress.easeFactor,
+      intervalDays: progress.intervalDays,
+      nextReviewAt: progress.nextReviewAt,
+      lastReviewedAt: progress.lastReviewAt ?? undefined,
+      totalReviews: progress.totalReviews,
+      correctReviews: progress.correctReviews,
+      addedAt: progress.addedAt,
+      masteredAt: progress.masteredAt ?? undefined,
     };
   }
 }

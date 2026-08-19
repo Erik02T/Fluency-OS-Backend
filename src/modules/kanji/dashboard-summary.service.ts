@@ -23,9 +23,11 @@ export class DashboardSummaryService {
     const [
       kanjiStudied,
       kanjiMastered,
-      dueReviews,
+      kanjiDueReviews,
+      vocabDueReviews,
       favoriteKanjis,
       reviewStats,
+      vocabReviewStats,
       recentProgress,
       streak,
     ] = await Promise.all([
@@ -41,10 +43,25 @@ export class DashboardSummaryService {
           nextReviewAt: { lte: now },
         },
       }),
+      this.prisma.userVocabularyProgress.count({
+        where: {
+          userId,
+          isSuspended: false,
+          isMastered: false,
+          nextReviewAt: { lte: now },
+        },
+      }),
       this.prisma.userKanjiProgress.count({
         where: { userId, isFavorite: true },
       }),
       this.prisma.userKanjiProgress.aggregate({
+        where: { userId },
+        _sum: {
+          totalReviews: true,
+          correctReviews: true,
+        },
+      }),
+      this.prisma.userVocabularyProgress.aggregate({
         where: { userId },
         _sum: {
           totalReviews: true,
@@ -65,8 +82,13 @@ export class DashboardSummaryService {
       }),
     ]);
 
-    const totalReviews = reviewStats._sum.totalReviews ?? 0;
-    const correctReviews = reviewStats._sum.correctReviews ?? 0;
+    const dueReviews = kanjiDueReviews + vocabDueReviews;
+    const totalReviews =
+      (reviewStats._sum.totalReviews ?? 0) +
+      (vocabReviewStats._sum.totalReviews ?? 0);
+    const correctReviews =
+      (reviewStats._sum.correctReviews ?? 0) +
+      (vocabReviewStats._sum.correctReviews ?? 0);
     const accuracyRate =
       totalReviews > 0
         ? Number(((correctReviews / totalReviews) * 100).toFixed(1))

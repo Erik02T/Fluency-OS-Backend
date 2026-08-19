@@ -29,7 +29,13 @@ Fonte de verdade para status Implementado:
 | Dashboard (resumo minimo) | Implementado | DashboardSummaryController |
 | Health/Liveness/Readiness | Implementado | AppController + AppService |
 | Dashboard expandido (overview/heatmap/milestones) | Em desenvolvimento | apenas /dashboard/summary ativo |
-| Users, Review, Vocabulary, Grammar, Immersion, Lists, Notifications, AI Tutor, WebSocket publico de produto | Planejado/Futuro | sem modulos ativos no AppModule atual |
+| Review (SRS sessions) | Implementado | modulo ativo em app.module.ts + ReviewController |
+| Vocabulary | Implementado | modulo ativo em app.module.ts + VocabularyController |
+| Grammar | Implementado | modulo ativo em app.module.ts + GrammarController |
+| Immersion | Implementado | modulo ativo em app.module.ts + ImmersionController |
+| Planner | Implementado | modulo ativo em app.module.ts + PlannerController |
+| Analytics | Implementado | modulo ativo em app.module.ts + AnalyticsController |
+| Notifications, Custom Lists, AI Tutor, WebSocket publico de produto | Planejado/Futuro | sem modulos ativos no AppModule atual |
 
 ## Implementado
 
@@ -89,6 +95,7 @@ Observacoes:
 | GET | /kanji/search | busca por query string (q, limit) |
 | GET | /kanji/search/:query | rota legada mantida por compatibilidade |
 | GET | /kanji/:id | detalhe completo |
+| POST | /kanji/:id/progress | estudar ou enviar kanji para revisão (cria/atualiza progresso SRS) |
 
 ### Kanji (admin)
 
@@ -100,6 +107,14 @@ Todas as rotas abaixo exigem JWT + role ADMIN.
 | POST | /admin/kanjis | cria kanji |
 | PUT | /admin/kanjis/:id | atualiza kanji |
 | DELETE | /admin/kanjis/:id | remove kanji |
+
+### Vocabulary
+
+| Metodo | Rota | Observacao |
+| --- | --- | --- |
+| GET | /vocabulary | lista paginada com filtros e ordenação |
+| GET | /vocabulary/:id | detalhe completo de vocabulário |
+| POST | /vocabulary/:id/progress | estudar ou enviar vocabulário para revisão (cria/atualiza progresso SRS) |
 
 ### Dashboard minimo
 
@@ -118,6 +133,36 @@ Campos atualmente retornados:
 - currentStreak
 - longestStreak
 - lastReviewAt
+
+### Review (SRS sessions)
+
+Todas as rotas abaixo exigem JWT Bearer.
+
+| Metodo | Rota | Observacao |
+| --- | --- | --- |
+| GET | /review/queue | fila de itens vencidos para revisao |
+| GET | /review/queue/count | contagem de itens pendentes |
+| POST | /review/sessions | inicia nova sessao de revisao |
+| GET | /review/sessions/:id | estado atual da sessao |
+| POST | /review/sessions/:id/answer | registra resposta SRS (atomico) |
+| POST | /review/sessions/:id/end | encerra sessao e calcula metricas |
+| POST | /review/sessions/:id/abandon | abandona sessao preservando progresso |
+| GET | /review/sessions/history | historico paginado do usuario |
+| GET | /review/sessions/:id/stats | estatisticas detalhadas da sessao |
+
+Estados de sessao:
+
+- in_progress
+- completed
+- abandoned
+
+Integracoes:
+
+- SRS (SRSService.calculateNextReview) — autoridade unica do algoritmo
+- Streak (StreakService.recordActivity) — atualizado dentro da transacao
+- Daily Goal (DailyGoalService.recordReviewProgress) — atualizado dentro da transacao
+- Eventos (ReviewEventsService) — KANJI_REVIEWED, KANJI_MASTERED, SESSION_COMPLETED
+- Redis — cache de contagem da fila (TTL 60s) com invalidacao apos resposta
 
 ## Em desenvolvimento
 
@@ -138,16 +183,12 @@ As rotas abaixo fazem parte do escopo funcional ja mapeado, mas nao estao ativas
 
 As secoes abaixo permanecem como alvo de produto e arquitetura, sem rotas ativas no AppModule atual:
 
-- Users
-- Review (SRS sessions)
-- Vocabulary
-- Grammar
-- Immersion
-- Sentence Mining
 - Notifications
 - Custom Lists
 - AI Tutor
 - WebSocket de eventos de produto
+- Sentence Mining (separado da Revisao SRS)
+- Users (gerenciamento avancado)
 
 ## Regra de governanca da documentacao
 
