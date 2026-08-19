@@ -3,7 +3,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import {
   CreateVocabularyDto,
   UpdateVocabularyProgressDto,
@@ -230,6 +229,9 @@ export class VocabularyService {
       return this.toProgressDto(vocabularyId, progress);
     }
 
+    // action === 'review'
+    // O item entra na fila IMEDIATAMENTE (nextReviewAt = now) para que
+    // apareça na fila de revisão sem esperar o próximo agendamento.
     if (!progress) {
       progress = await this.userVocabularyProgressRepository.create(
         userId,
@@ -237,14 +239,16 @@ export class VocabularyService {
       );
     }
 
-    const updateData = this.buildReviewUpdate(progress, dto.correct === true);
-    const updated = await this.userVocabularyProgressRepository.update(
+    // Força a próxima revisão para agora para que o item apareça na fila.
+    progress = await this.userVocabularyProgressRepository.update(
       userId,
       vocabularyId,
-      updateData,
+      {
+        nextReviewAt: new Date(),
+      },
     );
 
-    return this.toProgressDto(vocabularyId, updated);
+    return this.toProgressDto(vocabularyId, progress);
   }
 
   private toListDto(
@@ -338,33 +342,6 @@ export class VocabularyService {
       correctReviews: progress.correctReviews,
       addedAt: progress.addedAt,
       masteredAt: progress.masteredAt ?? undefined,
-    };
-  }
-
-  private buildReviewUpdate(
-    progress: UserVocabularyProgressEntity,
-    correct: boolean,
-  ): Prisma.UserVocabularyProgressUpdateInput {
-    const now = new Date();
-    const nextSrsLevel = correct
-      ? Math.min(progress.srsLevel + 1, 10)
-      : Math.max(progress.srsLevel - 1, 1);
-    const nextIntervalDays = correct
-      ? Math.min(Math.max(progress.intervalDays * 2, 1), 365)
-      : 1;
-    const nextReviewAt = new Date(now);
-    nextReviewAt.setDate(nextReviewAt.getDate() + nextIntervalDays);
-    const isMastered = nextSrsLevel >= 5;
-
-    return {
-      srsLevel: nextSrsLevel,
-      intervalDays: nextIntervalDays,
-      nextReviewAt,
-      lastReviewAt: now,
-      totalReviews: progress.totalReviews + 1,
-      correctReviews: progress.correctReviews + (correct ? 1 : 0),
-      isMastered,
-      masteredAt: isMastered ? (progress.masteredAt ?? now) : null,
     };
   }
 }
