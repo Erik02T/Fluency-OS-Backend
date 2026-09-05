@@ -16,6 +16,8 @@ export interface PlannerTaskDto {
   estimatedMinutes: number;
   kanjiGlyph: string;
   dueAt: string;
+  status?: string;
+  completed?: boolean;
   action:
     | { type: 'review_kanji'; count: number }
     | { type: 'review_vocabulary'; count: number }
@@ -51,11 +53,24 @@ export interface PlannerWeekDayDto {
 
 export interface PlannerSummaryDto {
   tasksCompletedToday: number;
+  tasksPendingToday: number;
   tasksTotalToday: number;
+  completionPercentage: number;
   studyMinutesToday: number;
+  categoriesStudiedToday: string[];
   currentStreakDays: number;
   longestStreakDays: number;
   todayDateLabel: string;
+}
+
+export interface TodaySummaryResponseDto {
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  completionPercentage: number;
+  minutesStudied: number;
+  categoriesStudied: string[];
+  streak: number;
 }
 
 export interface PlannerOverviewResponseDto {
