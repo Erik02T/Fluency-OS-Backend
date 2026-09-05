@@ -190,6 +190,7 @@ describe('VocabularyService', () => {
     expect(progressUpdateMock).toHaveBeenCalledWith(
       'user-123',
       'vocab-123',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       expect.objectContaining({ nextReviewAt: expect.any(Date) }),
     );
     expect(result.vocabularyId).toBe('vocab-123');
