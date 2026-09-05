@@ -230,6 +230,7 @@ export class VocabularyService {
       return this.toProgressDto(vocabularyId, progress);
     }
 
+    // action === 'review'
     if (!progress) {
       progress = await this.userVocabularyProgressRepository.create(
         userId,
