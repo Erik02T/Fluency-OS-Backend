@@ -175,27 +175,53 @@ describe('VocabularyService', () => {
     expect(result.totalReviews).toBe(2);
   });
 
-  it('should update review progress when reviewing a studied item', async () => {
-    const reviewedProgress: UserVocabularyProgress = {
-      ...mockProgress,
-      srsLevel: 4,
-      intervalDays: 8,
-      totalReviews: 3,
-      correctReviews: 3,
-      lastReviewAt: new Date(),
-    };
-
+  it('should set nextReviewAt to now on review action so it enters the queue immediately', async () => {
     vocabFindByIdFullMock.mockResolvedValue(detailFixture);
     progressFindByUserAndVocabularyMock.mockResolvedValue(mockProgress);
-    progressUpdateMock.mockResolvedValue(reviewedProgress);
+    progressUpdateMock.mockResolvedValue({
+      ...mockProgress,
+      nextReviewAt: new Date(),
+    });
 
     const result = await service.updateProgress('user-123', 'vocab-123', {
+      action: 'review',
+    });
+
+    expect(progressUpdateMock).toHaveBeenCalledWith(
+      'user-123',
+      'vocab-123',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      expect.objectContaining({ nextReviewAt: expect.any(Date) }),
+    );
+    expect(result.vocabularyId).toBe('vocab-123');
+    expect(result.srsLevel).toBe(mockProgress.srsLevel);
+  });
+
+  it('should increment review counters and timestamp on a correct review', async () => {
+    vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndVocabularyMock.mockResolvedValue(mockProgress);
+    progressUpdateMock.mockResolvedValue({
+      ...mockProgress,
+      totalReviews: mockProgress.totalReviews + 1,
+      correctReviews: mockProgress.correctReviews + 1,
+    });
+
+    await service.updateProgress('user-123', 'vocab-123', {
       action: 'review',
       correct: true,
     });
 
-    expect(progressUpdateMock).toHaveBeenCalled();
-    expect(result.srsLevel).toBe(4);
-    expect(result.correctReviews).toBe(3);
+    expect(progressUpdateMock).toHaveBeenCalledWith(
+      'user-123',
+      'vocab-123',
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        lastReviewAt: expect.any(Date),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        nextReviewAt: expect.any(Date),
+        totalReviews: { increment: 1 },
+        correctReviews: { increment: 1 },
+      }),
+    );
   });
 });

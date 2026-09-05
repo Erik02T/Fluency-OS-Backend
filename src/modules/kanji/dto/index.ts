@@ -13,3 +13,7 @@ export {
   PaginatedKanjiResponseDto,
   KanjiDetailResponseDto,
 } from './kanji-response.dto';
+export {
+  UpdateKanjiProgressDto,
+  KanjiProgressResponseDto,
+} from './kanji-progress.dto';

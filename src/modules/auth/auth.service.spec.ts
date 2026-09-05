@@ -198,6 +198,7 @@ describe('AuthService', () => {
 
       expect(result).toBeDefined();
       expect(result.accessToken).toBe('new_access_token');
+      expect(result.role).toBe(mockUser.role);
       expect(signAsyncSpy).toHaveBeenCalled();
     });
 

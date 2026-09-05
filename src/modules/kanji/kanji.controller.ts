@@ -1,11 +1,14 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Query,
   Request,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { JLPTLevel } from '@prisma/client';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { KanjiService } from './kanji.service';
 import {
   KanjiFiltersDto,
@@ -24,6 +28,8 @@ import {
   PaginatedKanjiResponseDto,
   KanjiDetailResponseDto,
   KanjiListResponseDto,
+  UpdateKanjiProgressDto,
+  KanjiProgressResponseDto,
 } from './dto';
 import { logStructured } from '../../common/logging/structured-log';
 
@@ -166,5 +172,50 @@ export class KanjiController {
       kanjiId: id,
     });
     return this.kanjiService.findById(id, userId);
+  }
+
+  /**
+   * POST /kanji/:id/progress
+   * Estudar ou enviar kanji para revisão (cria/atualiza progresso SRS)
+   */
+  @Post(':id/progress')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary:
+      'Estudar ou enviar kanji para revisão (cria/atualiza progresso SRS)',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'ID único do kanji (cuid)',
+    example: 'clxyz1234567890',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Progresso atualizado com sucesso',
+    type: KanjiProgressResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Kanji não encontrado',
+  })
+  async updateProgress(
+    @Param('id') id: string,
+    @Body() dto: UpdateKanjiProgressDto,
+    @Request() req: AuthRequest.AuthenticatedRequest,
+  ): Promise<KanjiProgressResponseDto> {
+    const userId = req.user!.id;
+    logStructured('info', 'KanjiController', 'kanji.progress.update', {
+      userId,
+      kanjiId: id,
+      action: dto.action,
+    });
+    return this.kanjiService.updateProgress(userId, id, dto);
   }
 }

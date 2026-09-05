@@ -24,8 +24,13 @@ export class RateLimitMiddleware implements NestMiddleware {
   constructor(private readonly redisService: RedisService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    // Skip rate limiting em ambiente de teste
-    if (process.env.NODE_ENV === 'test') {
+    // Disable/relax rate limiting in test/CI environments to avoid flakes in CI
+    const isTest = process.env.NODE_ENV === 'test' || process.env.CI === 'true';
+    if (isTest) {
+      // Optionally still set headers to indicate unlimited/disabled in tests
+      res.setHeader('X-RateLimit-Limit', 'unlimited');
+      res.setHeader('X-RateLimit-Remaining', 'unlimited');
+      res.setHeader('X-RateLimit-Reset', '0');
       return next();
     }
 

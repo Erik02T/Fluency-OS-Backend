@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
 import { RolesGuard } from './roles.guard';
@@ -34,7 +34,11 @@ describe('RolesGuard', () => {
       getAllAndOverride: jest.fn(() => [Role.ADMIN]),
     } as unknown as Reflector);
 
-    expect(guard.canActivate(createContext(Role.STUDENT))).toBe(false);
-    expect(guard.canActivate(createContext())).toBe(false);
+    expect(() => guard.canActivate(createContext(Role.STUDENT))).toThrow(
+      ForbiddenException,
+    );
+    expect(() => guard.canActivate(createContext())).toThrow(
+      ForbiddenException,
+    );
   });
 });

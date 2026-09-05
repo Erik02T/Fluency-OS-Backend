@@ -76,9 +76,46 @@ export class UserKanjiProgressRepository {
       data: {
         userId,
         kanjiId,
-        srsLevel: 0,
+        srsLevel: 1,
         nextReviewAt: tomorrow,
       },
     });
+  }
+
+  /**
+   * Atualizar entrada de progresso
+   * @param userId ID do usuário
+   * @param kanjiId ID do kanji
+   * @param data Dados para atualizar
+   * @returns Progresso atualizado
+   */
+  async update(
+    userId: string,
+    kanjiId: string,
+    data: import('@prisma/client').Prisma.UserKanjiProgressUpdateInput,
+  ): Promise<UserKanjiProgressEntity> {
+    return this.prisma.userKanjiProgress.update({
+      where: {
+        userId_kanjiId: { userId, kanjiId },
+      },
+      data,
+    });
+  }
+
+  /**
+   * Criar ou ignorar se já existir (upsert idempotente)
+   * @param userId ID do usuário
+   * @param kanjiId ID do kanji
+   * @returns Progresso existente ou recém-criado
+   */
+  async upsert(
+    userId: string,
+    kanjiId: string,
+  ): Promise<UserKanjiProgressEntity> {
+    const existing = await this.findByUserAndKanji(userId, kanjiId);
+    if (existing) {
+      return existing;
+    }
+    return this.create(userId, kanjiId);
   }
 }
