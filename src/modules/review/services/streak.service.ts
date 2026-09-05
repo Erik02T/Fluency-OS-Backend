@@ -40,6 +40,295 @@ export class StreakService {
   }
 
   /**
+   * Verifica se o dia está completo baseado nas tarefas do Planner
+   * Regra: 80% das tarefas planejadas para o dia devem estar concluídas
+   * Se não houver tarefas, retorna false (não conta como dia completo)
+   */
+  async isDayComplete(
+    userId: string,
+    dateStr: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    const db = tx ?? this.prisma;
+
+    const tasks = await db.plannerTask.findMany({
+      where: {
+        userId,
+        date: dateStr,
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    // Se não há tarefas, não conta como dia completo
+    if (tasks.length === 0) {
+      return false;
+    }
+
+    const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
+    const completionPercentage = (completedTasks / tasks.length) * 100;
+
+    // Dia completo se 80% ou mais das tarefas foram concluídas
+    return completionPercentage >= 80;
+  }
+
+  /**
+   * Registra conclusão de tarefa do Planner e atualiza Streak se dia estiver completo
+   * Este método é idempotente: não incrementa streak se já estiver completo no dia
+   */
+  async recordPlannerCompletion(
+    userId: string,
+    customTimezone?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    dayComplete: boolean;
+  }> {
+    const db = tx ?? this.prisma;
+
+    // Buscar timezone do usuário se não especificado
+    let timezone = customTimezone;
+    if (!timezone) {
+      const prefs = await db.userPreferences.findUnique({
+        where: { userId },
+        select: { timezone: true },
+      });
+      timezone = prefs?.timezone || 'America/Sao_Paulo';
+    }
+
+    const todayStr = this.getLocalDateString(new Date(), timezone);
+
+    // Verificar se o dia está completo
+    const dayComplete = await this.isDayComplete(userId, todayStr, db);
+
+    if (!dayComplete) {
+      // Dia não está completo, não atualiza streak
+      const streak = await db.streak.findUnique({
+        where: { userId },
+        select: { currentStreak: true, longestStreak: true },
+      });
+      return {
+        currentStreak: streak?.currentStreak ?? 0,
+        longestStreak: streak?.longestStreak ?? 0,
+        dayComplete: false,
+      };
+    }
+
+    // Dia está completo, verificar se já registramos isso hoje (idempotência)
+    const existingHistory = await db.streakHistory.findUnique({
+      where: {
+        userId_activityDate: {
+          userId,
+          activityDate: todayStr,
+        },
+      },
+    });
+
+    if (existingHistory && existingHistory.plannerTasksCompleted > 0) {
+      // Já registramos conclusão do Planner hoje, retorna estado atual sem alterar
+      const streak = await db.streak.findUnique({
+        where: { userId },
+        select: { currentStreak: true, longestStreak: true },
+      });
+      return {
+        currentStreak: streak?.currentStreak ?? 0,
+        longestStreak: streak?.longestStreak ?? 0,
+        dayComplete: true,
+      };
+    }
+
+    // Buscar ou criar streak
+    let streak = await db.streak.findUnique({
+      where: { userId },
+    });
+
+    let currentStreak = 1;
+    let longestStreak = 1;
+    let totalActiveDays = 1;
+
+    if (!streak) {
+      streak = await db.streak.create({
+        data: {
+          userId,
+          currentStreak: 1,
+          longestStreak: 1,
+          totalActiveDays: 1,
+          lastActivityDate: todayStr,
+        },
+      });
+    } else {
+      const lastDate = streak.lastActivityDate;
+
+      if (!lastDate) {
+        currentStreak = 1;
+        longestStreak = Math.max(streak.longestStreak, 1);
+        totalActiveDays = (streak.totalActiveDays || 0) + 1;
+      } else if (lastDate === todayStr) {
+        // Já realizou atividade hoje - mantém o streak atual
+        currentStreak = streak.currentStreak;
+        longestStreak = streak.longestStreak;
+        totalActiveDays = streak.totalActiveDays;
+      } else {
+        const daysDiff = this.getDaysDifference(lastDate, todayStr);
+
+        if (daysDiff === 1) {
+          // Dia consecutivo
+          currentStreak = streak.currentStreak + 1;
+          longestStreak = Math.max(streak.longestStreak, currentStreak);
+          totalActiveDays = streak.totalActiveDays + 1;
+        } else if (daysDiff === 2 && streak.freezesAvailable > 0) {
+          // Dia perdido protegido por Freeze
+          currentStreak = streak.currentStreak + 1;
+          longestStreak = Math.max(streak.longestStreak, currentStreak);
+          totalActiveDays = streak.totalActiveDays + 1;
+
+          await db.streak.update({
+            where: { id: streak.id },
+            data: {
+              freezesAvailable: Math.max(0, streak.freezesAvailable - 1),
+              freezesUsed: streak.freezesUsed + 1,
+            },
+          });
+        } else {
+          // Streak quebrado
+          currentStreak = 1;
+          longestStreak = Math.max(streak.longestStreak, 1);
+          totalActiveDays = streak.totalActiveDays + 1;
+        }
+      }
+
+      await db.streak.update({
+        where: { id: streak.id },
+        data: {
+          currentStreak,
+          longestStreak,
+          totalActiveDays,
+          lastActivityDate: todayStr,
+        },
+      });
+    }
+
+    // Atualizar / upsert StreakHistory para hoje com flag do Planner
+    const tasks = await db.plannerTask.findMany({
+      where: {
+        userId,
+        date: todayStr,
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
+
+    await db.streakHistory.upsert({
+      where: {
+        userId_activityDate: {
+          userId,
+          activityDate: todayStr,
+        },
+      },
+      create: {
+        userId,
+        streakId: streak.id,
+        activityDate: todayStr,
+        timezone,
+        plannerTasksCompleted: completedTasks,
+        plannerTasksTotal: tasks.length,
+      },
+      update: {
+        plannerTasksCompleted: completedTasks,
+        plannerTasksTotal: tasks.length,
+      },
+    });
+
+    this.logger.debug(
+      `Planner streak updated for user ${userId}: current=${currentStreak}, longest=${longestStreak}, dayComplete=${dayComplete}, date=${todayStr}`,
+    );
+
+    return { currentStreak, longestStreak, dayComplete };
+  }
+
+  /**
+   * Recalcula o streak após desfazer conclusão de tarefa
+   * Verifica se o dia ainda está completo e ajusta o streak se necessário
+   */
+  async recalculateAfterUndo(
+    userId: string,
+    customTimezone?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    dayComplete: boolean;
+  }> {
+    const db = tx ?? this.prisma;
+
+    // Buscar timezone do usuário se não especificado
+    let timezone = customTimezone;
+    if (!timezone) {
+      const prefs = await db.userPreferences.findUnique({
+        where: { userId },
+        select: { timezone: true },
+      });
+      timezone = prefs?.timezone || 'America/Sao_Paulo';
+    }
+
+    const todayStr = this.getLocalDateString(new Date(), timezone);
+
+    // Verificar se o dia ainda está completo
+    const dayComplete = await this.isDayComplete(userId, todayStr, db);
+
+    if (!dayComplete) {
+      // Dia não está mais completo, precisamos recalcular o streak
+      // Para simplificar, não decrementamos o streak atual, apenas não marcamos como completo hoje
+      // Em uma implementação mais complexa, poderíamos recalcular o histórico completo
+
+      const streak = await db.streak.findUnique({
+        where: { userId },
+        select: { currentStreak: true, longestStreak: true },
+      });
+
+      // Atualizar StreakHistory para refletir que o dia não está mais completo
+      await db.streakHistory
+        .update({
+          where: {
+            userId_activityDate: {
+              userId,
+              activityDate: todayStr,
+            },
+          },
+          data: {
+            plannerTasksCompleted: 0,
+          },
+        })
+        .catch(() => {
+          // Se não existe registro, ignora
+        });
+
+      return {
+        currentStreak: streak?.currentStreak ?? 0,
+        longestStreak: streak?.longestStreak ?? 0,
+        dayComplete: false,
+      };
+    }
+
+    // Dia ainda está completo, não há necessidade de alterar o streak
+    const streak = await db.streak.findUnique({
+      where: { userId },
+      select: { currentStreak: true, longestStreak: true },
+    });
+
+    return {
+      currentStreak: streak?.currentStreak ?? 0,
+      longestStreak: streak?.longestStreak ?? 0,
+      dayComplete: true,
+    };
+  }
+
+  /**
    * Registra atividade de revisão e atualiza Streak e StreakHistory
    */
   async recordActivity(
