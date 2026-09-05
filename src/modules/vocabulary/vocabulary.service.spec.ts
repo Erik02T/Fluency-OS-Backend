@@ -196,4 +196,32 @@ describe('VocabularyService', () => {
     expect(result.vocabularyId).toBe('vocab-123');
     expect(result.srsLevel).toBe(mockProgress.srsLevel);
   });
+
+  it('should increment review counters and timestamp on a correct review', async () => {
+    vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+    progressFindByUserAndVocabularyMock.mockResolvedValue(mockProgress);
+    progressUpdateMock.mockResolvedValue({
+      ...mockProgress,
+      totalReviews: mockProgress.totalReviews + 1,
+      correctReviews: mockProgress.correctReviews + 1,
+    });
+
+    await service.updateProgress('user-123', 'vocab-123', {
+      action: 'review',
+      correct: true,
+    });
+
+    expect(progressUpdateMock).toHaveBeenCalledWith(
+      'user-123',
+      'vocab-123',
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        lastReviewAt: expect.any(Date),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        nextReviewAt: expect.any(Date),
+        totalReviews: { increment: 1 },
+        correctReviews: { increment: 1 },
+      }),
+    );
+  });
 });

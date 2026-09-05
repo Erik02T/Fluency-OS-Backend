@@ -245,6 +245,9 @@ export class VocabularyService {
       vocabularyId,
       {
         nextReviewAt: new Date(),
+        lastReviewAt: new Date(),
+        totalReviews: { increment: 1 },
+        ...(dto.correct ? { correctReviews: { increment: 1 } } : {}),
       },
     );
 
