@@ -2,39 +2,38 @@
 ### Sistema Premium de Aquisição Natural de Japonês
 > Documento de Arquitetura e Engenharia · Versão 1.0 · Nível: Produção
 
-## STATUS REAL DE IMPLEMENTAÇÃO (RELEASE ATUAL)
+## STATUS REAL DE IMPLEMENTAÇÃO (RELEASE ATUAL — 2026-09-11)
 
-Este documento combina especificação alvo e estado real de código. Para evitar ambiguidade, a classificação oficial por release segue abaixo.
-
-Fonte de verdade para status Implementado:
-
-- src/app.module.ts (módulos ativos)
-- controllers existentes em src/
+Este documento preserva a especificação original e seus requisitos-alvo. O status operacional abaixo foi atualizado a partir de `src/app.module.ts`, controllers, services, schema, migrations, frontend clients e testes. A existência de uma entidade ou seção neste documento não comprova implementação.
 
 ### Implementado
 
-- Auth: registro, login, refresh, logout, me
-- Kanji público: listagem, busca, detalhe
-- Kanji admin: listagem, criação, edição, remoção
-- Dashboard mínimo: GET /dashboard/summary
-- Health: GET /, GET /health/live, GET /health, GET /health/ready
+- Auth: registro, login, refresh, logout e `me`.
+- Health: `/`, `/health/live`, `/health` e `/health/ready`.
+- Kanji público e administrativo, incluindo progresso.
+- Vocabulary público e administrativo, incluindo progresso.
+- Grammar público e administrativo, incluindo progresso.
+- Immersion: criação e listagem de logs.
+- Review/SRS para kanji e vocabulário, com sessões, histórico e estatísticas.
+- Dashboard mínimo: `/dashboard/summary`.
+- Planner: planos, metas e tarefas.
+- Analytics: `/analytics/overview`.
 
-### Em desenvolvimento
+### Parcial
 
-- Dashboard expandido (overview, streak detalhado, daily-goal, heatmap, milestones)
+- Refresh token: Redis/UUID ativo; hash em banco, rotação e detecção de reuso ausentes.
+- Streak e metas diárias: usados no fluxo de revisão; jobs, freeze e endpoints completos ausentes.
+- Dashboard expandido, cache, eventos e seeds completos.
+- Progresso de vocabulário não usa o `SRSService` centralizado na ação de revisão.
+- Administração sem importação em lote, gestão de usuários e métricas globais.
 
-### Planejado/Futuro
+### Não implementado
 
-- Users
-- Review (sessões SRS completas)
-- Vocabulary
-- Grammar
-- Immersion
-- Sentence Mining
-- Notifications
-- Custom Lists
-- AI Tutor
-- WebSocket de eventos de produto
+- Users, Notifications, Custom Lists, Sentence Mining e AI Tutor real.
+- Review SRS para grammar e sentences.
+- WebSocket, Bull, jobs agendados, SMTP, S3/R2, Prometheus/Grafana, CI/CD e backup automatizado.
+
+Consulte [PROJECT_STATUS.md](../PROJECT_STATUS.md) e [docs/api.md](docs/api.md) para o inventário operacional consolidado.
 
 ---
 
@@ -1012,6 +1011,40 @@ PUT    /admin/kanjis/:id
 DELETE /admin/kanjis/:id
 
 GET    /dashboard/summary
+
+GET    /vocabulary
+GET    /vocabulary/:id
+POST   /vocabulary/:id/progress
+
+GET    /grammar
+GET    /grammar/:id
+POST   /grammar/:id/progress
+
+GET    /immersion
+POST   /immersion
+
+GET    /planner/overview
+GET    /planner/summary/today
+GET    /planner/week
+PUT    /planner/weeks/:id/goals
+PATCH  /planner/weeks/:id
+POST   /planner/tasks
+GET    /planner/tasks
+PATCH  /planner/tasks/:id
+DELETE /planner/tasks/:id
+PATCH  /planner/tasks/:id/complete
+
+GET    /analytics/overview
+
+GET    /review/queue
+GET    /review/queue/count
+POST   /review/sessions
+GET    /review/sessions/history
+GET    /review/sessions/:id/stats
+GET    /review/sessions/:id
+POST   /review/sessions/:id/answer
+POST   /review/sessions/:id/end
+POST   /review/sessions/:id/abandon
 ```
 
 ### 5.0.2 Em desenvolvimento
@@ -1027,7 +1060,7 @@ GET    /dashboard/milestones
 
 ### 5.0.3 Planejado/Futuro
 
-Todos os demais grupos do módulo 05 (users, review, vocabulary, grammar, immersion, sentence mining, notifications, custom lists, AI tutor) permanecem como escopo alvo e ainda não devem ser tratados como ativos na release atual.
+Permanecem sem rotas ativas: users, dashboard expandido, sentence mining, notifications, custom lists, AI Tutor e WebSocket. Review, vocabulary, grammar e immersion não devem mais ser classificados como futuros nesta release.
 
 ## 5.1 · Convenções da API
 

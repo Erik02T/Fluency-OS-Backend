@@ -2,7 +2,9 @@
 
 [← Voltar ao README](../README.md) · [Architecture](./ARCHITECTURE.md) · [API](./API.md) · [Deployment](./DEPLOYMENT.md)
 
-PostgreSQL 16, modelado e migrado via **Prisma ORM**. 20 entidades organizadas em 7 grupos.
+PostgreSQL 16, modelado e migrado via **Prisma ORM**. O schema atual contém 31 models e 15 enums, incluindo conteúdo, progresso, revisão, imersão, planner e entidades previstas para recursos ainda não ativos.
+
+> **Status:** o schema está mais amplo que os módulos ativos. A existência de um model ou migration não comprova que exista fluxo de aplicação correspondente.
 
 ## Mapa de Entidades
 
@@ -128,19 +130,23 @@ CREATE INDEX idx_notifications_user_unread ON notifications(user_id) WHERE NOT i
 
 > ⚠️ `idx_ukp_review_queue` é o índice mais sensível do sistema — a fila de revisão é consultada a cada carregamento do dashboard e a cada resposta de sessão. Monitore `EXPLAIN ANALYZE` em produção regularmente.
 
-## Seed inicial
+## Estado dos seeds
 
 | Dado | Fonte |
 |---|---|
 | Kanjis, leituras, significados, grade, stroke count | **KANJIDIC2** (XML, Monash University) — 2.136 kanjis |
-| Ordem dos traços (SVG) | **KanjiVG** |
-| Vocabulário e exemplos | **JMdict** (170.000+ entradas) |
-| Frequência real em mídia | **JPDB.io API**, Anime Subtitle Corpus |
-| Vocabulário essencial ordenado | **Core 2000 / Core 6000** |
-| Classificação por nível | **Listas oficiais JLPT** N5–N1 |
-| Frequência em literatura | **Innocent Corpus** |
+| Vocabulário e exemplos | **JMdict** — seed e parser presentes |
+| Ordem dos traços (SVG) | Não foi encontrada implementação de importação |
+| Frequência real em mídia | Não foi encontrada integração JPDB ou corpus de legendas |
+| Vocabulário essencial ordenado | Não foi encontrada implementação Core 2000/6000 |
+| Classificação por nível | Campo JLPT existe; fonte externa não foi comprovada |
+| Frequência em literatura | Não foi encontrada integração do Innocent Corpus |
 
-Rodar com `pnpm prisma db seed` após as migrations.
+Foram encontrados seeds de KANJIDIC2 e JMdict. Não foi confirmada a execução recente nem um banco populado no ambiente atual.
+
+## Migrations presentes
+
+As migrations registradas incluem a fundação inicial, a consolidação do schema Fluency OS, `last_login_at`, alterações de vocabulário, o sistema de planner e campos adicionais em `streak_history`. O histórico documenta evolução do schema, não garante que todos os recursos modelados estejam expostos por API.
 
 ## Migrations
 
