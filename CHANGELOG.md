@@ -8,6 +8,13 @@ O formato segue o padrão **Keep a Changelog** e utiliza **Semantic Versioning (
 
 ## [Unreleased]
 
+### Documentation — 2026-09-11
+
+- Status dos módulos e rotas revisado conforme o código atual.
+- README, API, arquitetura, banco e deployment alinhados ao estado real.
+- Criado `PROJECT_STATUS.md` como documento central de progresso.
+- Registradas as diferenças entre a especificação original e a implementação atual.
+
 ### Added
 
 - Estrutura inicial da documentação (`docs/`)
