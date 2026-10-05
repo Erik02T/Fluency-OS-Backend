@@ -48,7 +48,10 @@ export class AdminGrammarExampleDto {
   // FASE 6 - Campos de enriquecimento
   @ApiPropertyOptional({
     type: Array,
-    example: [{ text: '毎朝', reading: 'まいあさ' }, { text: '日本語', reading: 'にほんご' }],
+    example: [
+      { text: '毎朝', reading: 'まいあさ' },
+      { text: '日本語', reading: 'にほんご' },
+    ],
   })
   @IsOptional()
   @IsArray()
@@ -150,7 +153,10 @@ export class CreateGrammarPointDto {
   // FASE 6 - Campos de enriquecimento do pattern
   @ApiPropertyOptional({
     type: Array,
-    example: [{ text: '〜て', reading: '〜て' }, { text: 'いる', reading: 'いる' }],
+    example: [
+      { text: '〜て', reading: '〜て' },
+      { text: 'いる', reading: 'いる' },
+    ],
   })
   @IsOptional()
   @IsArray()

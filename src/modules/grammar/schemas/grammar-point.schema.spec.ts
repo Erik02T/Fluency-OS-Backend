@@ -40,7 +40,13 @@ describe('GrammarPointSchema (Zod — FASE 0)', () => {
   // ─── ReviewStatus ────────────────────────────────────────────────────────────
   describe('ReviewStatusSchema', () => {
     it('should accept all valid statuses', () => {
-      const statuses = ['PENDING', 'GENERATED', 'VALIDATED', 'REVIEWED', 'PUBLISHED'];
+      const statuses = [
+        'PENDING',
+        'GENERATED',
+        'VALIDATED',
+        'REVIEWED',
+        'PUBLISHED',
+      ];
       for (const status of statuses) {
         expect(() => ReviewStatusSchema.parse(status)).not.toThrow();
       }
@@ -104,12 +110,18 @@ describe('GrammarPointSchema (Zod — FASE 0)', () => {
     });
 
     it('should reject difficulty outside 1-5', () => {
-      expect(() => GrammarPointSchema.parse({ ...validBase, difficulty: 0 })).toThrow();
-      expect(() => GrammarPointSchema.parse({ ...validBase, difficulty: 6 })).toThrow();
+      expect(() =>
+        GrammarPointSchema.parse({ ...validBase, difficulty: 0 }),
+      ).toThrow();
+      expect(() =>
+        GrammarPointSchema.parse({ ...validBase, difficulty: 6 }),
+      ).toThrow();
     });
 
     it('should reject invalid jlptLevel', () => {
-      expect(() => GrammarPointSchema.parse({ ...validBase, jlptLevel: 'N6' })).toThrow();
+      expect(() =>
+        GrammarPointSchema.parse({ ...validBase, jlptLevel: 'N6' }),
+      ).toThrow();
     });
 
     it('should reject invalid formalityLevel', () => {
@@ -126,17 +138,20 @@ describe('GrammarPointSchema (Zod — FASE 0)', () => {
 
     it('should accept a 64-char hex string as contentHash', () => {
       const hash = 'a'.repeat(64);
-      const result = GrammarPointSchema.parse({ ...validBase, contentHash: hash });
+      const result = GrammarPointSchema.parse({
+        ...validBase,
+        contentHash: hash,
+      });
       expect(result.contentHash).toBe(hash);
     });
 
     it('should reject missing pattern', () => {
-      const { pattern: _, ...rest } = validBase;
+      const { pattern: _pattern, ...rest } = validBase;
       expect(() => GrammarPointSchema.parse(rest)).toThrow();
     });
 
     it('should reject missing shortExplanation', () => {
-      const { shortExplanation: _, ...rest } = validBase;
+      const { shortExplanation: _shortExplanation, ...rest } = validBase;
       expect(() => GrammarPointSchema.parse(rest)).toThrow();
     });
   });
@@ -152,7 +167,7 @@ describe('GrammarPointSchema (Zod — FASE 0)', () => {
     });
 
     it('should default reviewStatus to PENDING in seed input', () => {
-      const { reviewStatus: _, ...rest } = validBase;
+      const { reviewStatus: _reviewStatus, ...rest } = validBase;
       const result = GrammarPointSeedInputSchema.parse(rest);
       expect(result.reviewStatus).toBe('PENDING');
     });
