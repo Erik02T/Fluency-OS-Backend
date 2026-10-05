@@ -5,7 +5,22 @@ node_modules
 /generated/prisma
 
 # Ignore raw datasets (large JSON/XML dumps, download separately from official releases)
-data/
+data/jmdict*.json
+data/*.json
+# Grammar pipeline: track directory structure; ignore ephemeral stage outputs
+data/generated/**
+!data/generated/.gitkeep
+data/validated/**
+!data/validated/.gitkeep
+data/rejected/**
+!data/rejected/.gitkeep
+# Rebuildable local sentence index
+data/processed/sentences/*.sqlite*
+!data/processed/sentences/.gitkeep
+# Keep normalized/*.json trackable (canonical dataset); ignore other clutter
+data/normalized/**
+!data/normalized/.gitkeep
+!data/normalized/*.json
 prisma/seed/vocabulary/raw/*.json
 prisma/seed/vocabulary/raw/*.xml
 prisma/seed/vocabulary/normalized/*.json
@@ -19,6 +34,7 @@ dist/
 
 # Ignore dependency directories
 node_modules/
+.venv/
 
 # Ignore test coverage output
 coverage/

@@ -44,6 +44,46 @@ export class AdminGrammarExampleDto {
   @IsOptional()
   @IsBoolean()
   isNatural?: boolean;
+
+  // FASE 6 - Campos de enriquecimento
+  @ApiPropertyOptional({
+    type: Array,
+    example: [
+      { text: '毎朝', reading: 'まいあさ' },
+      { text: '日本語', reading: 'にほんご' },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  furigana?: Array<{ text: string; reading: string }>;
+
+  @ApiPropertyOptional({
+    type: Object,
+    example: {
+      uniqueKanji: [{ character: '日', reading: 'にち', meaning: 'dia' }],
+      totalKanjiCount: 1,
+    },
+  })
+  @IsOptional()
+  kanjiBreakdown?: {
+    uniqueKanji: Array<{
+      character: string;
+      reading?: string;
+      meaning?: string;
+      jlpt?: string;
+    }>;
+    totalKanjiCount: number;
+  };
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  @IsInt()
+  characterCount?: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @IsInt()
+  wordCount?: number;
 }
 
 @ApiExtraModels(AdminGrammarExampleDto)
@@ -109,6 +149,79 @@ export class CreateGrammarPointDto {
   @ValidateNested({ each: true })
   @Type(() => AdminGrammarExampleDto)
   examples?: AdminGrammarExampleDto[];
+
+  // FASE 6 - Campos de enriquecimento do pattern
+  @ApiPropertyOptional({
+    type: Array,
+    example: [
+      { text: '〜て', reading: '〜て' },
+      { text: 'いる', reading: 'いる' },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  patternFurigana?: Array<{ text: string; reading: string }>;
+
+  @ApiPropertyOptional({
+    type: Object,
+    example: {
+      uniqueKanji: [],
+      totalKanjiCount: 0,
+    },
+  })
+  @IsOptional()
+  patternKanjiBreakdown?: {
+    uniqueKanji: Array<{
+      character: string;
+      reading?: string;
+      meaning?: string;
+      jlpt?: string;
+    }>;
+    totalKanjiCount: number;
+  };
+
+  // FASE 6 - Metadados de enriquecimento
+  @ApiPropertyOptional({
+    type: Object,
+    example: {
+      enrichedAt: '2026-09-30T00:00:00Z',
+      enricherVersion: '1.0.0',
+      totalUniqueKanji: 0,
+    },
+  })
+  @IsOptional()
+  enrichmentData?: {
+    enrichedAt: string;
+    enricherVersion: string;
+    totalUniqueKanji: number;
+  };
+
+  // FASE 7 - Metadados de validação
+  @ApiPropertyOptional({
+    type: Object,
+    example: {
+      validatedAt: '2026-09-30T00:00:00Z',
+      contentHash: 'abc123...',
+      warnings: [],
+    },
+  })
+  @IsOptional()
+  validationMetadata?: {
+    validatedAt: string;
+    contentHash: string;
+    warnings: string[];
+  };
+
+  // FASE 7 - Metadados de proveniência
+  @ApiPropertyOptional({ example: 'tanos' })
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  @ApiPropertyOptional({ example: 'N5-001' })
+  @IsOptional()
+  @IsString()
+  sourceId?: string;
 }
 
 export class UpdateGrammarPointDto extends PartialType(CreateGrammarPointDto) {}

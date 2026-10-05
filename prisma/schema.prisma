@@ -161,6 +161,14 @@ enum PlannerTaskStatus {
   COMPLETED
 }
 
+enum ReviewStatus {
+  PENDING    // criado, aguardando processamento
+  GENERATED  // gerado por script/IA, não revisado
+  VALIDATED  // passou por validação automática
+  REVIEWED   // revisado manualmente
+  PUBLISHED  // aprovado e visível para alunos
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MÓDULO: AUTH E USUÁRIOS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -470,22 +478,39 @@ model UserVocabularyProgress {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model GrammarPoint {
-  id                  String    @id @default(cuid())
-  pattern             String    @db.VarChar(200)  // ex: "〜ている", "〜たい"
+  id                  String       @id @default(cuid())
+  pattern             String       @db.VarChar(200)  // ex: "〜ている", "〜たい"
   jlptLevel           JLPTLevel
-  title               String    @db.VarChar(200)
-  shortExplanation    String    @db.VarChar(500)
-  detailedExplanation String?   @db.Text
-  formalityLevel      String    @default("neutral") @db.VarChar(20) // casual | neutral | formal | written
-  difficulty          Int       @default(1)  // 1-5 dentro do nível JLPT
-  position            Int       @default(0) // ordem de aprendizado
-  tags                String[]  // ex: ["verb", "tense", "te-form", "state"]
-  createdAt           DateTime  @default(now())
+  title               String       @db.VarChar(200)
+  shortExplanation    String       @db.VarChar(500)
+  detailedExplanation String?      @db.Text
+  formalityLevel      String       @default("neutral") @db.VarChar(20) // casual | neutral | formal | written
+  difficulty          Int          @default(1)  // 1-5 dentro do nível JLPT
+  position            Int          @default(0) // ordem de aprendizado
+  tags                String[]     // ex: ["verb", "tense", "te-form", "state"]
+
+  // Campos técnicos (FASE 0 - Rastreabilidade, Versionamento e QA)
+  source              String?      @db.VarChar(200)
+  sourceId            String?      @db.VarChar(200)
+  contentVersion      Int          @default(1)
+  contentHash         String?      @db.VarChar(64)
+  reviewStatus        ReviewStatus @default(PENDING)
+  reviewedAt          DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Campos de enriquecimento (FASE 6 - Furigana e Kanji Breakdown)
+  // Armazenados como JSONB para dados estruturados de furigana e kanji
+  enrichmentData      Json?        // Dados completos de enriquecimento (furigana, kanji breakdown, metadados)
+  patternFurigana     Json?        // Furigana segmentado do pattern gramatical
+  patternKanjiBreakdown Json?     // Breakdown de kanji do pattern
 
   examples     GrammarExample[]
   userProgress UserGrammarProgress[]
 
   @@index([jlptLevel, position])
+  @@index([reviewStatus])
+  @@index([source, sourceId])
   @@map("grammar_points")
 }
 
@@ -498,6 +523,12 @@ model GrammarExample {
   notes          String? @db.VarChar(300)
   isNatural      Boolean @default(true) // ocorrência natural vs exemplo didático
   position       Int     @default(0)
+
+  // Campos de enriquecimento (FASE 6 - Furigana e Kanji Breakdown)
+  furigana       Json?   // Furigana segmentado do exemplo
+  kanjiBreakdown Json?   // Breakdown de kanji do exemplo
+  characterCount Int?    // Contagem de caracteres
+  wordCount      Int?    // Contagem de palavras
 
   grammarPoint GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
 

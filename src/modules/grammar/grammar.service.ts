@@ -13,6 +13,7 @@ import {
   GrammarListResponseDto,
   GrammarProgressResponseDto,
   UpdateGrammarPointDto,
+  UpdateGrammarReviewStatusDto,
 } from './dto';
 import {
   GrammarRepository,
@@ -168,6 +169,45 @@ export class GrammarService {
     });
   }
 
+  async updateGrammarReviewStatus(
+    id: string,
+    dto: UpdateGrammarReviewStatusDto,
+  ): Promise<GrammarDetailResponseDto> {
+    logStructured(
+      'info',
+      'GrammarService',
+      'grammar.admin.review-status.start',
+      {
+        grammarPointId: id,
+        reviewStatus: dto.reviewStatus,
+        source: dto.source,
+      },
+    );
+
+    const grammarPoint = await this.grammarRepository.updateReviewStatus(id, {
+      reviewStatus: dto.reviewStatus,
+      source: dto.source,
+      sourceId: dto.sourceId,
+    });
+
+    if (!grammarPoint) {
+      throw new NotFoundException(`Grammar point with id ${id} not found`);
+    }
+
+    logStructured(
+      'info',
+      'GrammarService',
+      'grammar.admin.review-status.success',
+      {
+        grammarPointId: id,
+        reviewStatus: grammarPoint.reviewStatus,
+        contentVersion: grammarPoint.contentVersion,
+      },
+    );
+
+    return this.toDetailDto(grammarPoint);
+  }
+
   async updateProgress(
     userId: string,
     grammarPointId: string,
@@ -233,6 +273,7 @@ export class GrammarService {
       formalityLevel: item.formalityLevel,
       tags: item.tags,
       shortExplanation: item.shortExplanation,
+      reviewStatus: item.reviewStatus,
       examplesPreview: examples.map((example) => ({
         japanese: example.japanese,
         reading: example.reading,
@@ -271,6 +312,13 @@ export class GrammarService {
         notes: example.notes,
         isNatural: example.isNatural,
       })),
+      // FASE 0 — Rastreabilidade e QA
+      reviewStatus: grammarPoint.reviewStatus,
+      source: grammarPoint.source,
+      sourceId: grammarPoint.sourceId,
+      contentVersion: grammarPoint.contentVersion,
+      reviewedAt: grammarPoint.reviewedAt,
+      updatedAt: grammarPoint.updatedAt,
       userProgress: progress
         ? {
             isStudied: progress.isStudied,

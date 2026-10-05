@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -30,8 +31,23 @@ import {
   GrammarDetailResponseDto,
   PaginatedGrammarResponseDto,
   UpdateGrammarPointDto,
+  UpdateGrammarReviewStatusDto,
 } from './dto';
 import { logStructured } from '../../common/logging/structured-log';
+
+// FASE 16 - DTOs para administração do pipeline
+class PipelineOperationDto {
+  phase!: string;
+  level?: string;
+  dryRun?: boolean;
+  force?: boolean;
+}
+
+class RollbackOperationDto {
+  rollbackId!: string;
+  dryRun?: boolean;
+  force?: boolean;
+}
 
 @ApiTags('Admin Grammar')
 @ApiBearerAuth('access-token')
@@ -46,6 +62,20 @@ export class AdminGrammarController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'perPage', required: false, type: Number, example: 20 })
   @ApiQuery({ name: 'jlpt', required: false, enum: JLPTLevel })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['PENDING', 'GENERATED', 'VALIDATED', 'REVIEWED', 'PUBLISHED'],
+  })
+  @ApiQuery({ name: 'tag', required: false, type: String, example: 'verb' })
+  @ApiQuery({
+    name: 'difficulty',
+    required: false,
+    type: Number,
+    example: 2,
+    minimum: 1,
+    maximum: 5,
+  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -75,6 +105,32 @@ export class AdminGrammarController {
       },
     );
     return this.grammarService.findAll(filters);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Obter detalhe completo de ponto gramatical (admin)',
+  })
+  @ApiParam({ name: 'id', type: String, example: 'clxyz1234567890' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalhe administrativo da gramática retornado',
+    type: GrammarDetailResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Ponto gramatical não encontrado',
+  })
+  async getById(@Param('id') id: string): Promise<GrammarDetailResponseDto> {
+    logStructured(
+      'info',
+      'AdminGrammarController',
+      'admin.grammar.detail.request',
+      {
+        grammarPointId: id,
+      },
+    );
+    return this.grammarService.findById(id);
   }
 
   @Post()
@@ -142,5 +198,118 @@ export class AdminGrammarController {
       },
     );
     await this.grammarService.deleteAdminGrammarPoint(id);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: 'Atualizar status de revisão e metadados de proveniência',
+  })
+  @ApiParam({ name: 'id', type: String, example: 'clxyz1234567890' })
+  @ApiResponse({
+    status: 200,
+    description: 'Status de revisão atualizado com sucesso',
+    type: GrammarDetailResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Ponto gramatical não encontrado',
+  })
+  async patchStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateGrammarReviewStatusDto,
+  ): Promise<GrammarDetailResponseDto> {
+    logStructured(
+      'info',
+      'AdminGrammarController',
+      'admin.grammar.patch-status.request',
+      {
+        grammarPointId: id,
+        reviewStatus: dto.reviewStatus,
+        source: dto.source,
+        sourceId: dto.sourceId,
+      },
+    );
+    return this.grammarService.updateGrammarReviewStatus(id, dto);
+  }
+
+  // FASE 16 - Endpoints de administração do pipeline
+
+  @Post('pipeline/run')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Executar fase do pipeline de gramática' })
+  @ApiResponse({
+    status: 202,
+    description: 'Fase do pipeline iniciada com sucesso',
+  })
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async runPipelinePhase(
+    @Body() dto: PipelineOperationDto,
+  ): Promise<{ message: string; dryRun: boolean }> {
+    logStructured(
+      'info',
+      'AdminGrammarController',
+      'admin.grammar.pipeline.run',
+      {
+        phase: dto.phase,
+        level: dto.level,
+        dryRun: dto.dryRun,
+      },
+    );
+
+    // Integrar com scripts do pipeline (scripts/grammar/*.ts)
+    // Por enquanto, retorna resposta placeholder
+    return {
+      message: `Pipeline phase ${dto.phase} ${dto.dryRun ? '(dry-run)' : ''} initiated`,
+      dryRun: dto.dryRun || false,
+    };
+  }
+
+  @Get('pipeline/rollbacks')
+  @ApiOperation({ summary: 'Listar rollbacks disponíveis' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de rollbacks disponíveis',
+  })
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async listRollbacks(): Promise<{ rollbacks: any[] }> {
+    logStructured(
+      'info',
+      'AdminGrammarController',
+      'admin.grammar.pipeline.rollbacks.list',
+      {},
+    );
+
+    // Integrar com sistema de rollback (scripts/utils/rollback.ts)
+    // Por enquanto, retorna lista vazia
+    return { rollbacks: [] };
+  }
+
+  @Post('pipeline/rollback')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Executar rollback' })
+  @ApiResponse({
+    status: 202,
+    description: 'Rollback iniciado com sucesso',
+  })
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async executeRollback(
+    @Body() dto: RollbackOperationDto,
+  ): Promise<{ message: string; rollbackId: string }> {
+    logStructured(
+      'info',
+      'AdminGrammarController',
+      'admin.grammar.pipeline.rollback',
+      {
+        rollbackId: dto.rollbackId,
+        dryRun: dto.dryRun,
+      },
+    );
+
+    // Integrar com sistema de rollback (scripts/utils/rollback.ts)
+    // Por enquanto, retorna resposta placeholder
+    return {
+      message: `Rollback ${dto.rollbackId} ${dto.dryRun ? '(dry-run)' : ''} initiated`,
+      rollbackId: dto.rollbackId,
+    };
   }
 }

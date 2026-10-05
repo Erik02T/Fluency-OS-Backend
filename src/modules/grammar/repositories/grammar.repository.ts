@@ -114,6 +114,56 @@ export class GrammarRepository {
     });
   }
 
+  async updateReviewStatus(
+    id: string,
+    data: {
+      reviewStatus?: Prisma.GrammarPointUpdateInput['reviewStatus'];
+      source?: string | null;
+      sourceId?: string | null;
+    },
+  ): Promise<GrammarDetailEntity | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.grammarPoint.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return null;
+      }
+
+      const updateData: Prisma.GrammarPointUpdateInput = {};
+
+      if (data.reviewStatus !== undefined) {
+        updateData.reviewStatus = data.reviewStatus;
+        if (
+          data.reviewStatus === 'REVIEWED' ||
+          data.reviewStatus === 'PUBLISHED'
+        ) {
+          updateData.reviewedAt = new Date();
+        }
+        updateData.contentVersion = {
+          increment: 1,
+        };
+      }
+
+      if (data.source !== undefined) {
+        updateData.source = data.source;
+      }
+
+      if (data.sourceId !== undefined) {
+        updateData.sourceId = data.sourceId;
+      }
+
+      await tx.grammarPoint.update({
+        where: { id },
+        data: updateData,
+      });
+
+      return this.findByIdFullWithClient(tx, id);
+    });
+  }
+
   private async findByIdFullWithClient(
     client: Prisma.TransactionClient,
     id: string,
@@ -145,6 +195,13 @@ export class GrammarRepository {
       difficulty: dto.difficulty ?? 1,
       position: dto.position ?? 0,
       tags: dto.tags ?? [],
+      enrichmentData: dto.enrichmentData,
+      patternFurigana: dto.patternFurigana,
+      patternKanjiBreakdown: dto.patternKanjiBreakdown,
+      // FASE 7 - Metadados de proveniência e validação
+      source: dto.source,
+      sourceId: dto.sourceId,
+      contentHash: dto.validationMetadata?.contentHash,
     };
   }
 
@@ -170,6 +227,23 @@ export class GrammarRepository {
     if (dto.position !== undefined) data.position = dto.position;
     if (dto.tags !== undefined) data.tags = dto.tags;
 
+    if (dto.enrichmentData !== undefined) {
+      data.enrichmentData = dto.enrichmentData;
+    }
+    if (dto.patternFurigana !== undefined) {
+      data.patternFurigana = dto.patternFurigana;
+    }
+    if (dto.patternKanjiBreakdown !== undefined) {
+      data.patternKanjiBreakdown = dto.patternKanjiBreakdown;
+    }
+
+    // FASE 7 - Metadados de proveniência e validação
+    if (dto.source !== undefined) data.source = dto.source;
+    if (dto.sourceId !== undefined) data.sourceId = dto.sourceId;
+    if (dto.validationMetadata?.contentHash !== undefined) {
+      data.contentHash = dto.validationMetadata.contentHash;
+    }
+
     return data;
   }
 
@@ -191,6 +265,10 @@ export class GrammarRepository {
             notes: example.notes ?? null,
             isNatural: example.isNatural ?? true,
             position,
+            furigana: example.furigana,
+            kanjiBreakdown: example.kanjiBreakdown,
+            characterCount: example.characterCount,
+            wordCount: example.wordCount,
           })),
         });
       }
@@ -204,6 +282,20 @@ export class GrammarRepository {
 
     if (filters.jlpt) {
       where.jlptLevel = filters.jlpt;
+    }
+
+    if (filters.status) {
+      where.reviewStatus = filters.status;
+    }
+
+    if (filters.tag) {
+      where.tags = {
+        has: filters.tag,
+      };
+    }
+
+    if (filters.difficulty !== undefined) {
+      where.difficulty = filters.difficulty;
     }
 
     if (filters.search) {
