@@ -1,0 +1,92 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+.vscode/
+.idea/
+
+# Local env files
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma
+prisma/migrations/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Devin
+.devin/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Non-grammar modules (exclude from grammar branch)
+backend/src/modules/analytics/
+backend/src/modules/auth/
+backend/src/modules/immersion/
+backend/src/modules/kanji/
+backend/src/modules/planner/
+backend/src/modules/review/
+backend/src/modules/vocabulary/
+
+frontend/app/(dashboard)/dashboard/admin/
+frontend/app/(dashboard)/dashboard/ai/
+frontend/app/(dashboard)/dashboard/analytics/
+frontend/app/(dashboard)/dashboard/immersion/
+frontend/app/(dashboard)/dashboard/kanji/
+frontend/app/(dashboard)/dashboard/planner/
+frontend/app/(dashboard)/dashboard/review/
+frontend/app/(dashboard)/dashboard/study/
+frontend/app/(dashboard)/dashboard/vocab/
+
+# Grammar intermediate data (large, derived)
+backend/data/processed/
+backend/data/normalized/
+backend/data/generated/
+backend/data/enriched/
+backend/data/examples/
+backend/data/translated/
+backend/data/rejected/
+backend/data/backups/
+backend/data/production/
+backend/data/*.sqlite
+
+# External source data
+SEED_GRAMMAR_JPN/
