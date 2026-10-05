@@ -57,25 +57,6 @@ prisma/migrations/
 *.tmp
 *.temp
 
-# Non-grammar modules (exclude from grammar branch)
-backend/src/modules/analytics/
-backend/src/modules/auth/
-backend/src/modules/immersion/
-backend/src/modules/kanji/
-backend/src/modules/planner/
-backend/src/modules/review/
-backend/src/modules/vocabulary/
-
-frontend/app/(dashboard)/dashboard/admin/
-frontend/app/(dashboard)/dashboard/ai/
-frontend/app/(dashboard)/dashboard/analytics/
-frontend/app/(dashboard)/dashboard/immersion/
-frontend/app/(dashboard)/dashboard/kanji/
-frontend/app/(dashboard)/dashboard/planner/
-frontend/app/(dashboard)/dashboard/review/
-frontend/app/(dashboard)/dashboard/study/
-frontend/app/(dashboard)/dashboard/vocab/
-
 # Grammar intermediate data (large, derived)
 backend/data/processed/
 backend/data/normalized/
