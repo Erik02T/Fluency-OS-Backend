@@ -349,6 +349,10 @@ export class GrammarRepository {
       return [{ difficulty: sortOrder }, { position: 'asc' }];
     }
 
+    if (sortField === 'position') {
+      return [{ position: sortOrder }, { difficulty: 'asc' }];
+    }
+
     return [
       { jlptLevel: 'asc' },
       { position: sortOrder },
