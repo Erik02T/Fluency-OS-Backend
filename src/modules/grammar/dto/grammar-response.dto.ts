@@ -1,4 +1,4 @@
-import { JLPTLevel } from '@prisma/client';
+import { JLPTLevel, ReviewStatus } from '@prisma/client';
 
 export class GrammarListResponseDto {
   id!: string;
@@ -10,6 +10,7 @@ export class GrammarListResponseDto {
   formalityLevel!: string;
   tags!: string[];
   shortExplanation!: string;
+  reviewStatus!: ReviewStatus;
   examplesPreview!: Array<{
     japanese: string;
     reading: string | null;
@@ -52,6 +53,14 @@ export class GrammarDetailResponseDto {
     notes: string | null;
     isNatural: boolean;
   }>;
+
+  // FASE 0 — Rastreabilidade e QA
+  reviewStatus!: ReviewStatus;
+  source!: string | null;
+  sourceId!: string | null;
+  contentVersion!: number;
+  reviewedAt!: Date | null;
+  updatedAt!: Date;
 
   userProgress?: {
     isStudied: boolean;

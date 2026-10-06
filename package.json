@@ -19,7 +19,29 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed:vocabulary": "ts-node prisma/seed-vocabulary.ts",
+    "db:seed:grammar": "ts-node prisma/seed-grammar.ts",
+    "grammar:extract": "tsx scripts/grammar/extract.ts",
+    "grammar:normalize": "tsx scripts/grammar/normalize.ts",
+    "grammar:index-sentences": "tsx scripts/grammar/index-sentences.ts",
+    "grammar:match": "tsx scripts/grammar/match-patterns.ts",
+    "grammar:select-examples": "tsx scripts/grammar/select-examples.ts",
+    "grammar:generate-readings": "tsx scripts/grammar/generate-readings.ts",
+    "grammar:translate-examples": "tsx scripts/grammar/translate-examples.ts",
+    "grammar:translate-offline": "tsx scripts/grammar/translate-offline.ts",
+    "grammar:generate-readings-offline": "tsx scripts/grammar/generate-readings-offline.ts",
+    "grammar:validate-final": "tsx scripts/grammar/validate-final.ts",
+    "grammar:enrich": "tsx scripts/grammar/enrich.ts",
+    "grammar:validate": "tsx scripts/grammar/validate.ts",
+    "grammar:validate-complete": "tsx scripts/grammar/validate-complete.ts",
+    "grammar:import": "tsx scripts/grammar/import.ts",
+    "grammar:scale": "tsx scripts/grammar/scale.ts",
+    "grammar:qa": "tsx scripts/grammar/qa-sample.ts",
+    "grammar:structure": "tsx scripts/grammar/structure-grammar-points.ts",
+    "grammar:export": "tsx scripts/grammar/export.ts",
+    "grammar:test": "vitest run tests/grammar",
+    "grammar:all": "npm run grammar:extract && npm run grammar:normalize && npm run grammar:index-sentences && npm run grammar:select-examples && npm run grammar:generate-readings && npm run grammar:translate-examples"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -30,19 +52,22 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.4",
     "@prisma/client": "^6.19.3",
-    "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
+    "kuroshiro": "^1.2.0",
+    "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdf-parse": "^2.4.5",
     "prisma": "^6.19.3",
-    "redis": "^6.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^5.0.1"
+    "seek-bzip": "^2.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -50,12 +75,14 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
+    "@scriptin/jmdict-simplified-types": "^3.6.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.0.0",
     "@types/passport-jwt": "^4.0.1",
-    "@types/redis": "^4.0.10",
+    "@types/pdf-parse": "^1.1.5",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -70,8 +97,18 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.2"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    }
   },
   "jest": {
     "moduleFileExtensions": [

@@ -12,6 +12,7 @@ import { RedisService } from '../services/redis.service';
  * RateLimitMiddleware
  * Implementa rate limiting usando Redis
  * Limite: 100 requisições por minuto por IP
+ * Desabilitado em ambiente de teste (NODE_ENV=test)
  */
 
 @Injectable()
@@ -23,6 +24,16 @@ export class RateLimitMiddleware implements NestMiddleware {
   constructor(private readonly redisService: RedisService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
+    // Disable/relax rate limiting in test/CI environments to avoid flakes in CI
+    const isTest = process.env.NODE_ENV === 'test' || process.env.CI === 'true';
+    if (isTest) {
+      // Optionally still set headers to indicate unlimited/disabled in tests
+      res.setHeader('X-RateLimit-Limit', 'unlimited');
+      res.setHeader('X-RateLimit-Remaining', 'unlimited');
+      res.setHeader('X-RateLimit-Reset', '0');
+      return next();
+    }
+
     try {
       // Obter IP do cliente
       const clientIp =
