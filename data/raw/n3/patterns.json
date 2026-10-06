@@ -1,0 +1,443 @@
+[
+  {
+    "pattern": "～たばかり",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-001",
+    "position": 1
+  },
+  {
+    "pattern": "～ようになる",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-002",
+    "position": 2
+  },
+  {
+    "pattern": "～ことになる",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-003",
+    "position": 3
+  },
+  {
+    "pattern": "～とても～ない",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-004",
+    "position": 4
+  },
+  {
+    "pattern": "～らしい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-005",
+    "position": 5
+  },
+  {
+    "pattern": "～て初めて",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-006",
+    "position": 6
+  },
+  {
+    "pattern": "～ないで",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-007",
+    "position": 7
+  },
+  {
+    "pattern": "～によって",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-008",
+    "position": 8
+  },
+  {
+    "pattern": "～のような",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-009",
+    "position": 9
+  },
+  {
+    "pattern": "～ば～ほど",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-010",
+    "position": 10
+  },
+  {
+    "pattern": "N+ばかり",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-011",
+    "position": 11
+  },
+  {
+    "pattern": "～は～で有名",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-012",
+    "position": 12
+  },
+  {
+    "pattern": "N+を始め",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-013",
+    "position": 13
+  },
+  {
+    "pattern": "的",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-014",
+    "position": 14
+  },
+  {
+    "pattern": "～は～くらいです",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-015",
+    "position": 15
+  },
+  {
+    "pattern": "～さえ～ば",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-016",
+    "position": 16
+  },
+  {
+    "pattern": "ほど",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-017",
+    "position": 17
+  },
+  {
+    "pattern": "まま",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-018",
+    "position": 18
+  },
+  {
+    "pattern": "わざわざ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-019",
+    "position": 19
+  },
+  {
+    "pattern": "～としたら",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-020",
+    "position": 20
+  },
+  {
+    "pattern": "～たものだ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-021",
+    "position": 21
+  },
+  {
+    "pattern": "～たて",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-022",
+    "position": 22
+  },
+  {
+    "pattern": "～ぐらい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-023",
+    "position": 23
+  },
+  {
+    "pattern": "～かえって",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-024",
+    "position": 24
+  },
+  {
+    "pattern": "～には～の～がある",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-025",
+    "position": 25
+  },
+  {
+    "pattern": "～っぽい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-026",
+    "position": 26
+  },
+  {
+    "pattern": "～に関する",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-027",
+    "position": 27
+  },
+  {
+    "pattern": "まさか",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-028",
+    "position": 28
+  },
+  {
+    "pattern": "まい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-029",
+    "position": 29
+  },
+  {
+    "pattern": "きり",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-030",
+    "position": 30
+  },
+  {
+    "pattern": "いったい（一体）",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-031",
+    "position": 31
+  },
+  {
+    "pattern": "ふり",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-032",
+    "position": 32
+  },
+  {
+    "pattern": "どうやら",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-033",
+    "position": 33
+  },
+  {
+    "pattern": "おかげで",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-034",
+    "position": 34
+  },
+  {
+    "pattern": "さらに（更に）",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-035",
+    "position": 35
+  },
+  {
+    "pattern": "すでに（既に）",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-036",
+    "position": 36
+  },
+  {
+    "pattern": "つい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-037",
+    "position": 37
+  },
+  {
+    "pattern": "むしろ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-038",
+    "position": 38
+  },
+  {
+    "pattern": "さえ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-039",
+    "position": 39
+  },
+  {
+    "pattern": "～になれる",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-040",
+    "position": 40
+  },
+  {
+    "pattern": "～に違いない",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-041",
+    "position": 41
+  },
+  {
+    "pattern": "なかなか",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-042",
+    "position": 42
+  },
+  {
+    "pattern": "～ために",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-043",
+    "position": 43
+  },
+  {
+    "pattern": "～ず",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-044",
+    "position": 44
+  },
+  {
+    "pattern": "～によると",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-045",
+    "position": 45
+  },
+  {
+    "pattern": "～代わり",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-046",
+    "position": 46
+  },
+  {
+    "pattern": "ようにする",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-047",
+    "position": 47
+  },
+  {
+    "pattern": "～始める",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-048",
+    "position": 48
+  },
+  {
+    "pattern": "～ても",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-049",
+    "position": 49
+  },
+  {
+    "pattern": "～として",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-050",
+    "position": 50
+  },
+  {
+    "pattern": "ように",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-051",
+    "position": 51
+  },
+  {
+    "pattern": "こそ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-052",
+    "position": 52
+  },
+  {
+    "pattern": "～ないうちに",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-053",
+    "position": 53
+  },
+  {
+    "pattern": "どうしても",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-054",
+    "position": 54
+  },
+  {
+    "pattern": "～がち",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-055",
+    "position": 55
+  },
+  {
+    "pattern": "せいぜい",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-056",
+    "position": 56
+  },
+  {
+    "pattern": "限る",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-057",
+    "position": 57
+  },
+  {
+    "pattern": "～とともに～",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-058",
+    "position": 58
+  },
+  {
+    "pattern": "～たび～",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-059",
+    "position": 59
+  },
+  {
+    "pattern": "すぎない（過ぎない）",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-060",
+    "position": 60
+  },
+  {
+    "pattern": "おいて（於いて）",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-061",
+    "position": 61
+  },
+  {
+    "pattern": "～げ",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-062",
+    "position": 62
+  },
+  {
+    "pattern": "つもりで",
+    "jlpt": "N3",
+    "source": "tanos",
+    "sourceId": "n3-063",
+    "position": 63
+  }
+]

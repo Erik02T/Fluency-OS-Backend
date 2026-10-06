@@ -1,0 +1,352 @@
+[
+  {
+    "pattern": "～し",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-001",
+    "position": 1
+  },
+  {
+    "pattern": "そうです",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-002",
+    "position": 2
+  },
+  {
+    "pattern": "てみる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-003",
+    "position": 3
+  },
+  {
+    "pattern": "なら",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-004",
+    "position": 4
+  },
+  {
+    "pattern": "(period)に(frequency)",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-005",
+    "position": 5
+  },
+  {
+    "pattern": "～がほしい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-006",
+    "position": 6
+  },
+  {
+    "pattern": "～たがる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-007",
+    "position": 7
+  },
+  {
+    "pattern": "～かもしれない",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-008",
+    "position": 8
+  },
+  {
+    "pattern": "～たらどうですか",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-009",
+    "position": 9
+  },
+  {
+    "pattern": "Number+も",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-010",
+    "position": 10
+  },
+  {
+    "pattern": "しか～ない",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-011",
+    "position": 11
+  },
+  {
+    "pattern": "～ておく",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-012",
+    "position": 12
+  },
+  {
+    "pattern": "～よう",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-013",
+    "position": 13
+  },
+  {
+    "pattern": "～おう",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-014",
+    "position": 14
+  },
+  {
+    "pattern": "～てあげる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-015",
+    "position": 15
+  },
+  {
+    "pattern": "～てくれる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-016",
+    "position": 16
+  },
+  {
+    "pattern": "～てもらう",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-017",
+    "position": 17
+  },
+  {
+    "pattern": "～ていただけませんか",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-018",
+    "position": 18
+  },
+  {
+    "pattern": "～といいです",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-019",
+    "position": 19
+  },
+  {
+    "pattern": "～てすみません",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-020",
+    "position": 20
+  },
+  {
+    "pattern": "～そうです",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-021",
+    "position": 21
+  },
+  {
+    "pattern": "～させる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-022",
+    "position": 22
+  },
+  {
+    "pattern": "～なさい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-023",
+    "position": 23
+  },
+  {
+    "pattern": "～ば/～れば",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-024",
+    "position": 24
+  },
+  {
+    "pattern": "～ても",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-025",
+    "position": 25
+  },
+  {
+    "pattern": "～たら",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-026",
+    "position": 26
+  },
+  {
+    "pattern": "～なくてもいい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-027",
+    "position": 27
+  },
+  {
+    "pattern": "～みたい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-028",
+    "position": 28
+  },
+  {
+    "pattern": "～てしまう",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-029",
+    "position": 29
+  },
+  {
+    "pattern": "Dictionary form+と",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-030",
+    "position": 30
+  },
+  {
+    "pattern": "～ながら",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-031",
+    "position": 31
+  },
+  {
+    "pattern": "～ばよかった",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-032",
+    "position": 32
+  },
+  {
+    "pattern": "～てくれてありがとう",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-033",
+    "position": 33
+  },
+  {
+    "pattern": "～てよかった",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-034",
+    "position": 34
+  },
+  {
+    "pattern": "～はずです",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-035",
+    "position": 35
+  },
+  {
+    "pattern": "～ないで",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-036",
+    "position": 36
+  },
+  {
+    "pattern": "～かどうか",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-037",
+    "position": 37
+  },
+  {
+    "pattern": "～という～",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-038",
+    "position": 38
+  },
+  {
+    "pattern": "～やすい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-039",
+    "position": 39
+  },
+  {
+    "pattern": "～にくい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-040",
+    "position": 40
+  },
+  {
+    "pattern": "～られる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-041",
+    "position": 41
+  },
+  {
+    "pattern": "～てある",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-042",
+    "position": 42
+  },
+  {
+    "pattern": "～ているあいだに,～",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-043",
+    "position": 43
+  },
+  {
+    "pattern": "～く/ ～にする",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-044",
+    "position": 44
+  },
+  {
+    "pattern": "～のようてほしい",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-045",
+    "position": 45
+  },
+  {
+    "pattern": "のに",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-046",
+    "position": 46
+  },
+  {
+    "pattern": "～のような",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-047",
+    "position": 47
+  },
+  {
+    "pattern": "～のように",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-048",
+    "position": 48
+  },
+  {
+    "pattern": "～させられる",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-049",
+    "position": 49
+  },
+  {
+    "pattern": "～ことにする",
+    "jlpt": "N4",
+    "source": "tanos",
+    "sourceId": "n4-050",
+    "position": 50
+  }
+]

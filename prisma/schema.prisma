@@ -119,6 +119,56 @@ enum MilestoneType {
   SENTENCES_MINED_100
 }
 
+enum WeeklyPlanStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum PlannerGoalCategory {
+  IMMERSION
+  KANJI
+  VOCABULARY
+  GRAMMAR
+  GENERAL_REVIEW
+  READING
+  ACTIVE_STUDY
+  PASSIVE_STUDY
+}
+
+enum PlannerCategory {
+  KANJI
+  VOCABULARY
+  GRAMMAR
+  CHUNK
+  READING
+  IMMERSION
+  ACTIVE_STUDY
+  PASSIVE_STUDY
+  REVIEW
+  GENERAL
+  OTHER
+}
+
+enum PlannerTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PlannerTaskStatus {
+  PENDING
+  COMPLETED
+}
+
+enum ReviewStatus {
+  PENDING    // criado, aguardando processamento
+  GENERATED  // gerado por script/IA, não revisado
+  VALIDATED  // passou por validação automática
+  REVIEWED   // revisado manualmente
+  PUBLISHED  // aprovado e visível para alunos
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MÓDULO: AUTH E USUÁRIOS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -155,6 +205,8 @@ model User {
   notifications         Notification[]
   customLists           CustomList[]
   milestones            Milestone[]
+  weeklyPlans           WeeklyPlan[]
+  plannerTasks          PlannerTask[]
 
   @@index([email])
   @@index([deletedAt]) // queries de "usuários ativos"
@@ -344,16 +396,16 @@ model UserKanjiProgress {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model Vocabulary {
-  id           String    @id @default(cuid())
-  word         String    @db.VarChar(100)
-  reading      String    @db.VarChar(200) // leitura em hiragana/katakana
-  jlptLevel    JLPTLevel
+  id           String     @id @default(cuid())
+  word         String     @db.VarChar(100)
+  reading      String     @db.VarChar(200) // leitura em hiragana/katakana
+  jlptLevel    JLPTLevel? // nullable — não inventamos JLPT, preenchemos apenas com fonte confiável
   frequency    Int?
-  partOfSpeech String?   @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
-  tags         String[]  // categorias: ["daily", "formal", "anime", "business"]
-  notes        String?   @db.Text
-  audioUrl     String?   @db.Text
-  createdAt    DateTime  @default(now())
+  partOfSpeech String?    @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
+  tags         String[]   // categorias: ["daily", "formal", "anime", "business"]
+  notes        String?    @db.Text
+  audioUrl     String?    @db.Text
+  createdAt    DateTime   @default(now())
 
   meanings        VocabularyMeaning[]
   examples        VocabularyExample[]
@@ -426,22 +478,39 @@ model UserVocabularyProgress {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model GrammarPoint {
-  id                  String    @id @default(cuid())
-  pattern             String    @db.VarChar(200)  // ex: "〜ている", "〜たい"
+  id                  String       @id @default(cuid())
+  pattern             String       @db.VarChar(200)  // ex: "〜ている", "〜たい"
   jlptLevel           JLPTLevel
-  title               String    @db.VarChar(200)
-  shortExplanation    String    @db.VarChar(500)
-  detailedExplanation String?   @db.Text
-  formalityLevel      String    @default("neutral") @db.VarChar(20) // casual | neutral | formal | written
-  difficulty          Int       @default(1)  // 1-5 dentro do nível JLPT
-  position            Int       @default(0) // ordem de aprendizado
-  tags                String[]  // ex: ["verb", "tense", "te-form", "state"]
-  createdAt           DateTime  @default(now())
+  title               String       @db.VarChar(200)
+  shortExplanation    String       @db.VarChar(500)
+  detailedExplanation String?      @db.Text
+  formalityLevel      String       @default("neutral") @db.VarChar(20) // casual | neutral | formal | written
+  difficulty          Int          @default(1)  // 1-5 dentro do nível JLPT
+  position            Int          @default(0) // ordem de aprendizado
+  tags                String[]     // ex: ["verb", "tense", "te-form", "state"]
+
+  // Campos técnicos (FASE 0 - Rastreabilidade, Versionamento e QA)
+  source              String?      @db.VarChar(200)
+  sourceId            String?      @db.VarChar(200)
+  contentVersion      Int          @default(1)
+  contentHash         String?      @db.VarChar(64)
+  reviewStatus        ReviewStatus @default(PENDING)
+  reviewedAt          DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Campos de enriquecimento (FASE 6 - Furigana e Kanji Breakdown)
+  // Armazenados como JSONB para dados estruturados de furigana e kanji
+  enrichmentData      Json?        // Dados completos de enriquecimento (furigana, kanji breakdown, metadados)
+  patternFurigana     Json?        // Furigana segmentado do pattern gramatical
+  patternKanjiBreakdown Json?     // Breakdown de kanji do pattern
 
   examples     GrammarExample[]
   userProgress UserGrammarProgress[]
 
   @@index([jlptLevel, position])
+  @@index([reviewStatus])
+  @@index([source, sourceId])
   @@map("grammar_points")
 }
 
@@ -454,6 +523,12 @@ model GrammarExample {
   notes          String? @db.VarChar(300)
   isNatural      Boolean @default(true) // ocorrência natural vs exemplo didático
   position       Int     @default(0)
+
+  // Campos de enriquecimento (FASE 6 - Furigana e Kanji Breakdown)
+  furigana       Json?   // Furigana segmentado do exemplo
+  kanjiBreakdown Json?   // Breakdown de kanji do exemplo
+  characterCount Int?    // Contagem de caracteres
+  wordCount      Int?    // Contagem de palavras
 
   grammarPoint GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
 
@@ -554,17 +629,19 @@ model Streak {
 }
 
 model StreakHistory {
-  id            String   @id @default(cuid())
-  userId        String
-  streakId      String
-  activityDate  String   @db.VarChar(10) // YYYY-MM-DD no timezone do usuário
-  timezone      String   @db.VarChar(100)
-  kanjiReviewed Int      @default(0)
-  vocabReviewed Int      @default(0)
-  immersionMins Int      @default(0)
-  totalReviews  Int      @default(0)
-  wasFreeze     Boolean  @default(false) // dia protegido por freeze
-  createdAt     DateTime @default(now())
+  id                    String   @id @default(cuid())
+  userId                String
+  streakId              String
+  activityDate          String   @db.VarChar(10) // YYYY-MM-DD no timezone do usuário
+  timezone              String   @db.VarChar(100)
+  kanjiReviewed         Int      @default(0)
+  vocabReviewed         Int      @default(0)
+  immersionMins         Int      @default(0)
+  totalReviews          Int      @default(0)
+  wasFreeze             Boolean  @default(false) // dia protegido por freeze
+  plannerTasksCompleted Int      @default(0) // tarefas do Planner concluídas
+  plannerTasksTotal     Int      @default(0) // total de tarefas do Planner
+  createdAt             DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   streak Streak @relation(fields: [streakId], references: [id], onDelete: Cascade)
@@ -726,4 +803,73 @@ model Milestone {
   @@unique([userId, type]) // cada milestone só pode ser atingido uma vez
   @@index([userId, achievedAt(sort: Desc)])
   @@map("milestones")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: PLANNER (PLANEJAMENTO SEMANAL, METAS E TAREFAS)
+// ══════════════════════════════════════════════════════════════════════════════
+
+model WeeklyPlan {
+  id         String           @id @default(cuid())
+  userId     String
+  year       Int
+  weekNumber Int
+  startDate  String           @db.VarChar(10) // YYYY-MM-DD
+  endDate    String           @db.VarChar(10) // YYYY-MM-DD
+  status     WeeklyPlanStatus @default(ACTIVE)
+  notes      String?          @db.Text
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goals WeeklyGoal[]
+  tasks PlannerTask[]
+
+  @@unique([userId, year, weekNumber])
+  @@index([userId, startDate])
+  @@map("weekly_plans")
+}
+
+model WeeklyGoal {
+  id           String              @id @default(cuid())
+  weeklyPlanId String
+  category     PlannerGoalCategory
+  targetValue  Int
+  unit         String              @default("") @db.VarChar(20)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  weeklyPlan WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([weeklyPlanId, category])
+  @@index([weeklyPlanId])
+  @@map("weekly_goals")
+}
+
+model PlannerTask {
+  id               String              @id @default(cuid())
+  userId           String
+  weeklyPlanId     String?
+  title            String              @db.VarChar(300)
+  description      String?             @db.Text
+  category         PlannerCategory     @default(GENERAL)
+  date             String              @db.VarChar(10) // YYYY-MM-DD
+  scheduledTime    String?             @db.VarChar(10) // HH:mm
+  estimatedMinutes Int                 @default(15)
+  actualMinutes    Int?
+  priority         PlannerTaskPriority @default(MEDIUM)
+  status           PlannerTaskStatus   @default(PENDING)
+  completedAt      DateTime?
+  isAutoGenerated  Boolean             @default(false)
+  actionPayload    Json?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyPlan WeeklyPlan? @relation(fields: [weeklyPlanId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([userId, status])
+  @@index([weeklyPlanId])
+  @@map("planner_tasks")
 }

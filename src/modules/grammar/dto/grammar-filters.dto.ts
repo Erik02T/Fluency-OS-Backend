@@ -1,6 +1,14 @@
 import { Type, Transform } from 'class-transformer';
-import { IsEnum, IsIn, IsOptional, IsString, Max, Min } from 'class-validator';
-import { JLPTLevel } from '@prisma/client';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { JLPTLevel, ReviewStatus } from '@prisma/client';
 
 export class GrammarFiltersDto {
   @IsOptional()
@@ -8,6 +16,27 @@ export class GrammarFiltersDto {
     message: 'Invalid JLPT level. Must be one of: N5, N4, N3, N2, N1',
   })
   jlpt?: JLPTLevel;
+
+  @IsOptional()
+  @IsEnum(ReviewStatus, {
+    message:
+      'Invalid review status. Must be one of: PENDING, GENERATED, VALIDATED, REVIEWED, PUBLISHED',
+  })
+  status?: ReviewStatus;
+
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  tag?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  difficulty?: number;
 
   @IsOptional()
   @IsString()
