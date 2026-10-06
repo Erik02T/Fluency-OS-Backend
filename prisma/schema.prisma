@@ -1,0 +1,729 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Fluency OS — Schema Prisma Completo
+// 28 entidades | 10 enums | 3 extensões SQL customizadas
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ENUMS
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum JLPTLevel {
+  N5
+  N4
+  N3
+  N2
+  N1
+}
+
+enum ReadingType {
+  ONYOMI   // 音読み — leitura sino-japonesa
+  KUNYOMI  // 訓読み — leitura japonesa nativa
+  NANORI   // 名乗り — leitura usada em nomes próprios
+}
+
+enum SRSItemType {
+  KANJI
+  VOCABULARY
+  SENTENCE
+}
+
+enum ReviewSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum ReviewQuality {
+  BLACKOUT     // 0 — bloqueio total, não lembrou nada
+  WRONG        // 1 — errou, mas reconheceu ao ver a resposta
+  CORRECT_HARD // 2 — acertou com dificuldade
+  CORRECT_EASY // 3 — acertou facilmente
+}
+
+enum ImmersionType {
+  ANIME
+  DRAMA
+  PODCAST
+  YOUTUBE
+  MANGA
+  NOVEL
+  VISUAL_NOVEL
+  GAME
+  NEWS
+  MUSIC
+  MOVIE
+  OTHER
+}
+
+enum NotificationType {
+  REVIEW_DUE
+  STREAK_WARNING
+  STREAK_BROKEN
+  STREAK_MILESTONE
+  DAILY_GOAL_COMPLETED
+  MILESTONE_ACHIEVED
+  KANJI_MASTERED
+  SYSTEM_MESSAGE
+}
+
+enum CustomListItemType {
+  KANJI
+  VOCABULARY
+  SENTENCE
+}
+
+enum MilestoneType {
+  FIRST_REVIEW
+  FIRST_MASTERED
+  KANJIS_MASTERED_10
+  KANJIS_MASTERED_25
+  KANJIS_MASTERED_50
+  KANJIS_MASTERED_100
+  KANJIS_MASTERED_200
+  KANJIS_MASTERED_500
+  KANJIS_MASTERED_1000
+  VOCAB_MASTERED_100
+  VOCAB_MASTERED_500
+  VOCAB_MASTERED_1000
+  VOCAB_MASTERED_2000
+  STREAK_7_DAYS
+  STREAK_30_DAYS
+  STREAK_100_DAYS
+  STREAK_365_DAYS
+  REVIEWS_100
+  REVIEWS_1000
+  REVIEWS_5000
+  REVIEWS_10000
+  IMMERSION_10_HOURS
+  IMMERSION_50_HOURS
+  IMMERSION_100_HOURS
+  JLPT_N5_COMPLETE
+  JLPT_N4_COMPLETE
+  JLPT_N3_COMPLETE
+  SENTENCES_MINED_10
+  SENTENCES_MINED_100
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: AUTH E USUÁRIOS
+// ══════════════════════════════════════════════════════════════════════════════
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique @db.VarChar(255)
+  username        String    @unique @db.VarChar(50)
+  passwordHash    String    @db.Text
+  displayName     String?   @db.VarChar(100)
+  avatarUrl       String?   @db.Text
+  role            Role      @default(STUDENT)
+  jlptGoal        JLPTLevel @default(N5)
+  isEmailVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  lastActiveAt    DateTime?
+  deletedAt       DateTime? // soft delete — mantém histórico de uso
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // ─── Relações ─────────────────────────────────────────────────────────────
+  preferences           UserPreferences?
+  refreshTokens         RefreshToken[]
+  kanjiProgress         UserKanjiProgress[]
+  vocabProgress         UserVocabularyProgress[]
+  grammarProgress       UserGrammarProgress[]
+  reviewSessions        ReviewSession[]
+  streak                Streak?
+  streakHistory         StreakHistory[]
+  dailyGoals            DailyGoal[]
+  immersionLogs         ImmersionLog[]
+  minedSentences        MinedSentence[]
+  notifications         Notification[]
+  customLists           CustomList[]
+  milestones            Milestone[]
+
+  @@index([email])
+  @@index([deletedAt]) // queries de "usuários ativos"
+  @@map("users")
+}
+
+model UserPreferences {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  timezone             String   @default("America/Sao_Paulo") @db.VarChar(100)
+  dailyKanjiGoal       Int      @default(10)
+  dailyVocabGoal       Int      @default(20)
+  dailyReviewGoal      Int      @default(50)
+  dailyImmersionGoal   Int      @default(30)  // minutos
+  notificationsEnabled Boolean  @default(true)
+  streakFreezes        Int      @default(3)
+  srsMaxNewPerDay      Int      @default(20)
+  srsMaxReviewsPerDay  Int      @default(200)
+  uiLanguage           String   @default("pt-BR") @db.VarChar(10)
+  reviewReminderHour   Int      @default(9)   // hora local para lembrete (0-23)
+  streakWarningHour    Int      @default(20)  // hora local para aviso de streak
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// tokenHash: UUID opaco é gerado, hashed com SHA-256 e armazenado aqui.
+// O token bruto NUNCA é armazenado. Isso é implementado na Fase 3.
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique @db.Char(64) // SHA-256 hex (64 chars)
+  expiresAt  DateTime
+  isRevoked  Boolean   @default(false)
+  revokedAt  DateTime?
+  deviceInfo String?   @db.VarChar(500) // user-agent para auditoria
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt]) // cleanup de tokens expirados
+  @@map("refresh_tokens")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: BANCO DE KANJIS (conteúdo global, imutável)
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Kanji {
+  id          String    @id @default(cuid())
+  character   String    @unique @db.VarChar(4)
+  jlptLevel   JLPTLevel
+  grade       Int?      // ano escolar japonês (1-6 para jōyō básico)
+  strokeCount Int?
+  frequency   Int?      // ranking por frequência em jornais (menor = mais comum)
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  unicodeCodepoint String?
+  romanization String?
+
+  meanings     KanjiMeaning[]
+  readings     KanjiReading[]
+  examples     KanjiExample[]
+  radicals     KanjiRadical[]
+  userProgress UserKanjiProgress[]
+
+  // Índices básicos — GIN trigram criado via migration SQL customizado
+  @@index([jlptLevel])
+  @@index([frequency])
+  @@index([grade])
+  @@map("kanjis")
+}
+
+model KanjiMeaning {
+  id        String  @id @default(cuid())
+  kanjiId   String
+  meaning   String  @db.VarChar(200)
+  isPrimary Boolean @default(false)
+  language  String  @default("en") @db.VarChar(5)
+  position  Int     @default(0)
+
+  kanji Kanji @relation(fields: [kanjiId], references: [id], onDelete: Cascade)
+
+  @@index([kanjiId])
+  @@map("kanji_meanings")
+}
+
+model KanjiReading {
+  id        String      @id @default(cuid())
+  kanjiId   String
+  reading   String      @db.VarChar(50)
+  type      ReadingType
+  isPrimary Boolean     @default(false)
+  romanji   String?     @db.VarChar(50)
+
+  kanji Kanji @relation(fields: [kanjiId], references: [id], onDelete: Cascade)
+
+  @@index([kanjiId])
+  @@map("kanji_readings")
+}
+
+model KanjiExample {
+  id        String     @id @default(cuid())
+  kanjiId   String
+  word      String     @db.VarChar(50)
+  reading   String     @db.VarChar(100)
+  meaning   String     @db.VarChar(300)
+  jlptLevel JLPTLevel?
+  position  Int        @default(0)
+
+  kanji Kanji @relation(fields: [kanjiId], references: [id], onDelete: Cascade)
+
+  @@index([kanjiId])
+  @@map("kanji_examples")
+}
+
+model Radical {
+  id          String  @id @default(cuid())
+  character   String  @unique @db.VarChar(4)
+  name        String  @db.VarChar(50)
+  meaning     String  @db.VarChar(100)
+  strokeCount Int
+  position    Int? // "top", "left", "right", "bottom", "enclosing"
+
+  kanjis KanjiRadical[]
+
+  @@map("radicals")
+}
+
+// Tabela de junção: kanji ↔ radical (muitos-para-muitos)
+model KanjiRadical {
+  kanjiId   String
+  radicalId String
+  isPrimary Boolean @default(false)
+
+  kanji   Kanji   @relation(fields: [kanjiId], references: [id], onDelete: Cascade)
+  radical Radical @relation(fields: [radicalId], references: [id], onDelete: Cascade)
+
+  @@id([kanjiId, radicalId])
+  @@map("kanji_radicals")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: PROGRESSO SRS DE KANJI
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ⚠️ TABELA CRÍTICA: índice parcial criado via SQL raw (ver migration)
+// O índice filtra apenas itens: não suspensos, não dominados, adicionados
+// Sem esse índice, a query de fila de revisão faz FULL TABLE SCAN.
+model UserKanjiProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  kanjiId        String
+  // SM-2 fields
+  srsLevel       Int       @default(1)    // 1-10 (>= 5 = dominado)
+  easeFactor     Float     @default(2.5)  // SM-2 fator de facilidade (min 1.3)
+  intervalDays   Int       @default(1)    // intervalo até próxima revisão
+  nextReviewAt   DateTime  @default(now())
+  lastReviewAt   DateTime?
+  // Estatísticas
+  totalReviews   Int       @default(0)
+  correctReviews Int       @default(0)
+  // Status
+  isMastered     Boolean   @default(false)  // true quando srsLevel >= 5
+  isFavorite     Boolean   @default(false)
+  isSuspended    Boolean   @default(false)  // pausa o item na fila
+  addedAt        DateTime  @default(now())
+  masteredAt     DateTime?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kanji Kanji @relation(fields: [kanjiId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kanjiId])
+  // Index base — o PARTIAL index é criado via SQL na migration
+  @@index([userId, nextReviewAt])
+  @@index([userId, isMastered])
+  @@index([userId, isFavorite])
+  @@map("user_kanji_progress")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: BANCO DE VOCABULÁRIO
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Vocabulary {
+  id           String    @id @default(cuid())
+  word         String    @db.VarChar(100)
+  reading      String    @db.VarChar(200) // leitura em hiragana/katakana
+  jlptLevel    JLPTLevel
+  frequency    Int?
+  partOfSpeech String?   @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
+  tags         String[]  // categorias: ["daily", "formal", "anime", "business"]
+  notes        String?   @db.Text
+  audioUrl     String?   @db.Text
+  createdAt    DateTime  @default(now())
+
+  meanings        VocabularyMeaning[]
+  examples        VocabularyExample[]
+  userProgress    UserVocabularyProgress[]
+  customListItems CustomListItem[]
+
+  @@unique([word, reading])
+  @@index([jlptLevel])
+  @@index([frequency])
+  @@map("vocabulary")
+}
+
+model VocabularyMeaning {
+  id           String  @id @default(cuid())
+  vocabularyId String
+  meaning      String  @db.VarChar(300)
+  context      String? @db.VarChar(200) // ex: "used in formal context"
+  isPrimary    Boolean @default(false)
+  position     Int     @default(0)
+
+  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@index([vocabularyId])
+  @@map("vocabulary_meanings")
+}
+
+model VocabularyExample {
+  id           String  @id @default(cuid())
+  vocabularyId String
+  japanese     String  @db.Text
+  reading      String? @db.Text
+  translation  String  @db.Text
+  source       String? @db.VarChar(200) // ex: "Tatoeba", "JMdict"
+
+  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@index([vocabularyId])
+  @@map("vocabulary_examples")
+}
+
+// ⚠️ Mesmo padrão de índice parcial que UserKanjiProgress
+model UserVocabularyProgress {
+  id             String    @id @default(cuid())
+  userId         String
+  vocabularyId   String
+  srsLevel       Int       @default(1)
+  easeFactor     Float     @default(2.5)
+  intervalDays   Int       @default(1)
+  nextReviewAt   DateTime  @default(now())
+  lastReviewAt   DateTime?
+  totalReviews   Int       @default(0)
+  correctReviews Int       @default(0)
+  isMastered     Boolean   @default(false)
+  isFavorite     Boolean   @default(false)
+  isSuspended    Boolean   @default(false)
+  addedAt        DateTime  @default(now())
+  masteredAt     DateTime?
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabulary Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+  @@index([userId, nextReviewAt])
+  @@index([userId, isMastered])
+  @@map("user_vocabulary_progress")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: GRAMÁTICA
+// ══════════════════════════════════════════════════════════════════════════════
+
+model GrammarPoint {
+  id                  String    @id @default(cuid())
+  pattern             String    @db.VarChar(200)  // ex: "〜ている", "〜たい"
+  jlptLevel           JLPTLevel
+  title               String    @db.VarChar(200)
+  shortExplanation    String    @db.VarChar(500)
+  detailedExplanation String?   @db.Text
+  formalityLevel      String    @default("neutral") @db.VarChar(20) // casual | neutral | formal | written
+  difficulty          Int       @default(1)  // 1-5 dentro do nível JLPT
+  position            Int       @default(0) // ordem de aprendizado
+  tags                String[]  // ex: ["verb", "tense", "te-form", "state"]
+  createdAt           DateTime  @default(now())
+
+  examples     GrammarExample[]
+  userProgress UserGrammarProgress[]
+
+  @@index([jlptLevel, position])
+  @@map("grammar_points")
+}
+
+model GrammarExample {
+  id             String  @id @default(cuid())
+  grammarPointId String
+  japanese       String  @db.Text
+  reading        String? @db.Text
+  translation    String  @db.Text
+  notes          String? @db.VarChar(300)
+  isNatural      Boolean @default(true) // ocorrência natural vs exemplo didático
+  position       Int     @default(0)
+
+  grammarPoint GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
+
+  @@index([grammarPointId])
+  @@map("grammar_examples")
+}
+
+model UserGrammarProgress {
+  id              String    @id @default(cuid())
+  userId          String
+  grammarPointId  String
+  isStudied       Boolean   @default(false)
+  studiedAt       DateTime?
+  isFavorite      Boolean   @default(false)
+  confidenceLevel Int       @default(0) // 0-5 (self-reported)
+  notes           String?   @db.Text
+  reviewCount     Int       @default(0)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grammarPoint GrammarPoint @relation(fields: [grammarPointId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, grammarPointId])
+  @@map("user_grammar_progress")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: REVISÃO SRS
+// ══════════════════════════════════════════════════════════════════════════════
+
+model ReviewSession {
+  id              String              @id @default(cuid())
+  userId          String
+  status          ReviewSessionStatus @default(IN_PROGRESS)
+  itemType        SRSItemType         @default(KANJI)
+  totalItems      Int                 @default(0)
+  completedItems  Int                 @default(0)
+  correctItems    Int                 @default(0)
+  accuracyRate    Float?              // calculado ao final
+  durationSeconds Int?
+  startedAt       DateTime            @default(now())
+  completedAt     DateTime?
+  abandonedAt     DateTime?
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers ReviewAnswer[]
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([userId, status])
+  @@map("review_sessions")
+}
+
+// itemId é uma string polimórfica (kanjiId OU vocabularyId)
+// A integridade é garantida pelo service layer (Fase 7)
+// Não há FK explícita aqui para evitar complexidade de relação polimórfica no Prisma
+model ReviewAnswer {
+  id             String        @id @default(cuid())
+  sessionId      String
+  itemType       SRSItemType
+  itemId         String        // kanjiId ou vocabularyId
+  quality        ReviewQuality
+  responseTimeMs Int?
+  srsLevelBefore Int
+  srsLevelAfter  Int
+  intervalBefore Int           // dias
+  intervalAfter  Int           // dias
+  answeredAt     DateTime      @default(now())
+
+  session ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([itemType, itemId]) // para reconstruir histórico de um item específico
+  @@map("review_answers")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: STREAK E METAS DIÁRIAS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ⚠️ ATENÇÃO TIMEZONE:
+// lastActivityDate é armazenada como String YYYY-MM-DD no timezone do usuário
+// NÃO como DateTime UTC. Comparações devem sempre usar a timezone do user.
+model Streak {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  currentStreak    Int       @default(0)
+  longestStreak    Int       @default(0)
+  lastActivityDate String?   @db.VarChar(10) // YYYY-MM-DD (no timezone do usuário)
+  freezesAvailable Int       @default(3)
+  freezesUsed      Int       @default(0)
+  totalActiveDays  Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history StreakHistory[]
+
+  @@map("streaks")
+}
+
+model StreakHistory {
+  id            String   @id @default(cuid())
+  userId        String
+  streakId      String
+  activityDate  String   @db.VarChar(10) // YYYY-MM-DD no timezone do usuário
+  timezone      String   @db.VarChar(100)
+  kanjiReviewed Int      @default(0)
+  vocabReviewed Int      @default(0)
+  immersionMins Int      @default(0)
+  totalReviews  Int      @default(0)
+  wasFreeze     Boolean  @default(false) // dia protegido por freeze
+  createdAt     DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  streak Streak @relation(fields: [streakId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityDate]) // exatamente 1 registro por usuário por dia
+  @@index([userId, activityDate(sort: Desc)])
+  @@map("streak_history")
+}
+
+// goalDate: String YYYY-MM-DD no timezone do usuário (mesmo padrão do streak)
+model DailyGoal {
+  id                     String    @id @default(cuid())
+  userId                 String
+  goalDate               String    @db.VarChar(10) // YYYY-MM-DD no timezone do usuário
+  timezone               String    @db.VarChar(100)
+  // Metas (capturadas das preferences no momento da criação)
+  targetKanji            Int       @default(10)
+  targetVocab            Int       @default(20)
+  targetReviews          Int       @default(50)
+  targetImmersionMins    Int       @default(30)
+  // Progresso atual
+  completedKanji         Int       @default(0)
+  completedVocab         Int       @default(0)
+  completedReviews       Int       @default(0)
+  completedImmersionMins Int       @default(0)
+  isCompleted            Boolean   @default(false)
+  completedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, goalDate])
+  @@index([userId, goalDate(sort: Desc)])
+  @@map("daily_goals")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: IMERSÃO E SENTENCE MINING
+// ══════════════════════════════════════════════════════════════════════════════
+
+model ImmersionLog {
+  id              String        @id @default(cuid())
+  userId          String
+  type            ImmersionType
+  title           String        @db.VarChar(300)
+  episode         String?       @db.VarChar(100) // "EP 01", "Capítulo 3"
+  durationMinutes Int
+  comprehension   Int?          // 0-100 (percepção do usuário)
+  isActive        Boolean       @default(true) // ativo = conta para meta diária
+  notes           String?       @db.Text
+  loggedAt        DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minedSentences MinedSentence[]
+
+  @@index([userId, loggedAt(sort: Desc)])
+  @@index([userId, type])
+  @@map("immersion_logs")
+}
+
+model MinedSentence {
+  id             String    @id @default(cuid())
+  userId         String
+  immersionLogId String?   // pode existir sem log de imersão associado
+  japanese       String    @db.Text
+  reading        String?   @db.Text
+  translation    String?   @db.Text
+  notes          String?   @db.Text
+  source         String?   @db.VarChar(300) // "Spirited Away - 01:24:33"
+  isFavorite     Boolean   @default(false)
+  reviewCount    Int       @default(0)
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  immersionLog ImmersionLog? @relation(fields: [immersionLogId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isFavorite])
+  @@map("mined_sentences")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: NOTIFICAÇÕES
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String           @db.VarChar(200)
+  body      String           @db.Text
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  data      Json?            // payload extra para deep links e contexto
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: LISTAS CUSTOMIZADAS
+// ══════════════════════════════════════════════════════════════════════════════
+
+model CustomList {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  isPublic    Boolean  @default(false)
+  itemCount   Int      @default(0) // desnormalizado para performance em listagens
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CustomListItem[]
+
+  @@index([userId])
+  @@map("custom_lists")
+}
+
+// itemId é polimórfico (kanjiId | vocabularyId | minedSentenceId)
+// Integridade garantida no service layer
+model CustomListItem {
+  id           String             @id @default(cuid())
+  listId       String
+  itemType     CustomListItemType
+  itemId       String             // ref polimórfica: kanji/vocab/sentence
+  position     Int                @default(0)
+  addedAt      DateTime           @default(now())
+
+  list       CustomList  @relation(fields: [listId], references: [id], onDelete: Cascade)
+  vocabulary Vocabulary? @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, itemType, itemId])
+  @@index([listId, position])
+  @@map("custom_list_items")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MÓDULO: MILESTONES
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Milestone {
+  id         String        @id @default(cuid())
+  userId     String
+  type       MilestoneType
+  achievedAt DateTime      @default(now())
+  data       Json?         // contexto: { streakDays: 30 }, { kanjiCount: 100 }
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type]) // cada milestone só pode ser atingido uma vez
+  @@index([userId, achievedAt(sort: Desc)])
+  @@map("milestones")
+}
