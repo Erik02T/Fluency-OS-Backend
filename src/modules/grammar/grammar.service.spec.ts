@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JLPTLevel, ReviewStatus, UserGrammarProgress } from '@prisma/client';
+import { JLPTLevel, UserGrammarProgress } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 import { GrammarService } from './grammar.service';
 import {
@@ -38,16 +38,6 @@ describe('GrammarService', () => {
     position: 1,
     tags: ['verb', 'tense'],
     createdAt: new Date(),
-    updatedAt: new Date(),
-    reviewStatus: ReviewStatus.PENDING,
-    source: null,
-    sourceId: null,
-    contentVersion: 1,
-    contentHash: null,
-    reviewedAt: null,
-    enrichmentData: null,
-    patternFurigana: null,
-    patternKanjiBreakdown: null,
     examples: [
       {
         japanese: '食べている',
@@ -82,16 +72,6 @@ describe('GrammarService', () => {
     position: 1,
     tags: ['verb', 'tense'],
     createdAt: new Date(),
-    updatedAt: new Date(),
-    reviewStatus: ReviewStatus.PENDING,
-    source: null,
-    sourceId: null,
-    contentVersion: 1,
-    contentHash: null,
-    reviewedAt: null,
-    enrichmentData: null,
-    patternFurigana: null,
-    patternKanjiBreakdown: null,
     examples: [
       {
         id: 'example-1',
@@ -102,10 +82,6 @@ describe('GrammarService', () => {
         notes: 'Exemplo básico',
         isNatural: true,
         position: 0,
-        furigana: null,
-        kanjiBreakdown: null,
-        characterCount: null,
-        wordCount: null,
       },
     ],
   };
