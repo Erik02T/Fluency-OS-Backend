@@ -128,9 +128,7 @@ export class AuthService {
    * @param refreshToken Refresh token válido (UUID armazenado em Redis)
    * @returns Novo access token
    */
-  async refreshToken(
-    refreshToken: string,
-  ): Promise<{ accessToken: string; role: JwtPayload['role'] }> {
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string }> {
     logStructured('info', 'AuthService', 'auth.refresh.start', {
       hasRefreshToken: Boolean(refreshToken),
     });
@@ -170,7 +168,7 @@ export class AuthService {
       userId: user.id,
     });
 
-    return { accessToken, role: user.role };
+    return { accessToken };
   }
 
   /**

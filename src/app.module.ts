@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
+import { KanjiModule } from './modules/kanji/kanji.module';
+import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
 import { GrammarModule } from './modules/grammar/grammar.module';
 import { CommonModule } from './common/common.module';
 import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
@@ -18,6 +20,8 @@ import { validateEnv } from './config/validation.schema';
     }),
     CommonModule,
     AuthModule,
+    KanjiModule,
+    VocabularyModule,
     GrammarModule,
   ],
   controllers: [AppController],

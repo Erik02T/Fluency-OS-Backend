@@ -16,7 +16,6 @@ import {
   ApiCreatedResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { CreateUserDto, LoginDto, RefreshDto, AuthResponseDto } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -24,10 +23,8 @@ import type { AuthenticatedRequest } from './interfaces/authenticated-request.in
 import type { Response } from 'express';
 import {
   ADMIN_REFRESH_COOKIE,
-  AUTH_ROLE_COOKIE,
   REFRESH_TOKEN_MAX_AGE_MS,
 } from './auth.constants';
-import { createSignedRoleCookieValue } from './auth-role-cookie';
 import { logStructured } from '../../common/logging/structured-log';
 
 @ApiTags('Auth')
@@ -53,31 +50,6 @@ export class AuthController {
       path: '/',
       maxAge: REFRESH_TOKEN_MAX_AGE_MS,
     };
-  }
-
-  private setAuthCookies(
-    res: Response,
-    refreshToken: string,
-    role: Role,
-  ): void {
-    res.cookie(ADMIN_REFRESH_COOKIE, refreshToken, this.getCookieOptions());
-    res.cookie(
-      AUTH_ROLE_COOKIE,
-      createSignedRoleCookieValue(role),
-      this.getCookieOptions(),
-    );
-  }
-
-  private clearAuthCookies(res: Response): void {
-    const clearOptions = {
-      httpOnly: true,
-      sameSite: 'lax' as const,
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-    };
-
-    res.clearCookie(ADMIN_REFRESH_COOKIE, clearOptions);
-    res.clearCookie(AUTH_ROLE_COOKIE, clearOptions);
   }
 
   private parseRefreshTokenFromCookie(cookieHeader?: string): string | null {
@@ -142,7 +114,11 @@ export class AuthController {
     });
 
     const result = await this.authService.register(dto);
-    this.setAuthCookies(res, result.refreshToken, result.user.role);
+    res.cookie(
+      ADMIN_REFRESH_COOKIE,
+      result.refreshToken,
+      this.getCookieOptions(),
+    );
     logStructured('info', 'AuthController', 'auth.register.success', {
       userId: result.user.id,
       email: result.user.email,
@@ -175,7 +151,11 @@ export class AuthController {
     });
 
     const result = await this.authService.login(dto);
-    this.setAuthCookies(res, result.refreshToken, result.user.role);
+    res.cookie(
+      ADMIN_REFRESH_COOKIE,
+      result.refreshToken,
+      this.getCookieOptions(),
+    );
     logStructured('info', 'AuthController', 'auth.login.success', {
       userId: result.user.id,
       email: result.user.email,
@@ -202,20 +182,13 @@ export class AuthController {
   async refresh(
     @Body() dto: RefreshDto,
     @Request() req: AuthenticatedRequest,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string }> {
     logStructured('info', 'AuthController', 'auth.refresh.request', {
       hasBodyToken: Boolean(dto.refreshToken?.trim()),
     });
 
     const refreshToken = this.resolveRefreshToken(dto, req);
-    const result = await this.authService.refreshToken(refreshToken ?? '');
-    res.cookie(
-      AUTH_ROLE_COOKIE,
-      createSignedRoleCookieValue(result.role),
-      this.getCookieOptions(),
-    );
-    return { accessToken: result.accessToken };
+    return this.authService.refreshToken(refreshToken ?? '');
   }
 
   /**
@@ -241,7 +214,12 @@ export class AuthController {
 
     const refreshToken = this.resolveRefreshToken(dto, req);
     await this.authService.logout(refreshToken ?? '');
-    this.clearAuthCookies(res);
+    res.clearCookie(ADMIN_REFRESH_COOKIE, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+    });
     return { message: 'Logout successful' };
   }
 
