@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { OptionalJwtMiddleware } from '../auth/middleware/optional-jwt.middleware';
 
+import { AdminVocabularyController } from './admin-vocabulary.controller';
 import { VocabularyController } from './vocabulary.controller';
 import { VocabularyService } from './vocabulary.service';
 import {
@@ -11,7 +12,7 @@ import {
 
 @Module({
   imports: [AuthModule],
-  controllers: [VocabularyController],
+  controllers: [VocabularyController, AdminVocabularyController],
   providers: [
     VocabularyService,
     VocabularyRepository,
