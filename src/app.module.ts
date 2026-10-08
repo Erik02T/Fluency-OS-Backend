@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { KanjiModule } from './modules/kanji/kanji.module';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module';
@@ -18,6 +19,7 @@ import { validateEnv } from './config/validation.schema';
       envFilePath: '.env',
       validate: validateEnv,
     }),
+    DatabaseModule,
     CommonModule,
     AuthModule,
     KanjiModule,

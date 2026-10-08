@@ -88,17 +88,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async storeRefreshToken(userId: string, tokenId: string): Promise<void> {
     const key = `refresh_token:${userId}:${tokenId}`;
+    const lookupKey = `refresh_token_lookup:${tokenId}`;
 
     // Em ambiente de teste, usa armazenamento em memória
     if (this.isTestEnv) {
       this.testStorage.set(key, userId);
+      this.testStorage.set(lookupKey, userId);
       return;
     }
 
     const ttl = 7 * 24 * 60 * 60; // 7 dias em segundos
 
     try {
-      await this.client.setex(key, ttl, userId);
+      await this.client
+        .pipeline()
+        .setex(key, ttl, userId)
+        .setex(lookupKey, ttl, userId)
+        .exec();
     } catch (error) {
       this.logger.error(
         `Failed to store refresh token: ${error instanceof Error ? error.message : String(error)}`,
@@ -142,15 +148,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async invalidateRefreshToken(userId: string, tokenId: string): Promise<void> {
     const key = `refresh_token:${userId}:${tokenId}`;
+    const lookupKey = `refresh_token_lookup:${tokenId}`;
 
     // Em ambiente de teste, usa armazenamento em memória
     if (this.isTestEnv) {
       this.testStorage.delete(key);
+      this.testStorage.delete(lookupKey);
       return;
     }
 
     try {
-      await this.client.del(key);
+      await this.client.del(key, lookupKey);
     } catch (error) {
       this.logger.error(
         `Failed to invalidate refresh token: ${error instanceof Error ? error.message : String(error)}`,
@@ -160,24 +168,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Encontrar o userId associado a um refresh token
+   * Encontrar o userId associado a um refresh token (O(1) lookup)
    * @param tokenId ID do refresh token
    * @returns userId ou null se o token não existir
    */
   async findUserIdByRefreshToken(tokenId: string): Promise<string | null> {
-    const pattern = `refresh_token:*:${tokenId}`;
+    const lookupKey = `refresh_token_lookup:${tokenId}`;
 
     // Em ambiente de teste, usa armazenamento em memória
     if (this.isTestEnv) {
-      for (const [key, value] of this.testStorage.entries()) {
-        if (key.endsWith(`:${tokenId}`)) {
-          return value;
-        }
-      }
-      return null;
+      return this.testStorage.get(lookupKey) || null;
     }
 
     try {
+      const userId = await this.client.get(lookupKey);
+      if (userId) {
+        return userId;
+      }
+
+      // Fallback para chaves sem lookup direto (compatibilidade)
+      const pattern = `refresh_token:*:${tokenId}`;
       const keys = await this.client.keys(pattern);
       if (keys.length === 0) {
         return null;
@@ -201,9 +211,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     // Em ambiente de teste, usa armazenamento em memória
     if (this.isTestEnv) {
-      for (const key of this.testStorage.keys()) {
+      for (const key of Array.from(this.testStorage.keys())) {
         if (key.startsWith(`refresh_token:${userId}:`)) {
+          const tokenId = key.split(':')[2];
           this.testStorage.delete(key);
+          if (tokenId) {
+            this.testStorage.delete(`refresh_token_lookup:${tokenId}`);
+          }
         }
       }
       return;
@@ -212,7 +226,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       const keys = await this.client.keys(pattern);
       if (keys.length > 0) {
-        await this.client.del(...keys);
+        const lookupKeys = keys
+          .map((k) => k.split(':')[2])
+          .filter(Boolean)
+          .map((id) => `refresh_token_lookup:${id}`);
+        await this.client.del(...keys, ...lookupKeys);
       }
     } catch (error) {
       this.logger.error(
