@@ -17,12 +17,16 @@ export class UserRepository {
     passwordHash: string;
     displayName?: string;
   }): Promise<User> {
+    // Cria usuário + preferências + streak em uma única operação atômica:
+    // qualquer falha intermediária reverte todo o registro.
     return this.prisma.user.create({
       data: {
         email: data.email,
         username: data.username,
         passwordHash: data.passwordHash,
         displayName: data.displayName,
+        preferences: { create: {} },
+        streak: { create: {} },
       },
     });
   }
