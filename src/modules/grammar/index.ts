@@ -1,5 +1,6 @@
 export { GrammarModule } from './grammar.module';
 export { GrammarController } from './grammar.controller';
+export { AdminGrammarController } from './admin-grammar.controller';
 export { GrammarService } from './grammar.service';
 export * from './dto';
 export * from './repositories';

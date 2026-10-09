@@ -6,3 +6,8 @@ export {
   GrammarDetailResponseDto,
   GrammarProgressResponseDto,
 } from './grammar-response.dto';
+export {
+  CreateGrammarPointDto,
+  UpdateGrammarPointDto,
+  AdminGrammarExampleDto,
+} from './grammar-admin.dto';

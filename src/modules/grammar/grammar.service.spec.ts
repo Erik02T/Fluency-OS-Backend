@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JLPTLevel, UserGrammarProgress } from '@prisma/client';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { GrammarService } from './grammar.service';
 import {
   GrammarRepository,
@@ -15,6 +15,10 @@ describe('GrammarService', () => {
   const grammarFindAllMock = jest.fn();
   const grammarCountMock = jest.fn();
   const grammarFindByIdFullMock = jest.fn();
+  const grammarFindByPatternAndJlptMock = jest.fn();
+  const grammarCreateAdminMock = jest.fn();
+  const grammarUpdateAdminMock = jest.fn();
+  const grammarDeleteAdminMock = jest.fn();
   const progressFindByUserAndGrammarPointMock = jest.fn();
   const progressFindByUserAndGrammarPointsMock = jest.fn();
   const progressCreateMock = jest.fn();
@@ -96,6 +100,10 @@ describe('GrammarService', () => {
             findAll: grammarFindAllMock,
             count: grammarCountMock,
             findByIdFull: grammarFindByIdFullMock,
+            findByPatternAndJlpt: grammarFindByPatternAndJlptMock,
+            createAdminGrammarPoint: grammarCreateAdminMock,
+            updateAdminGrammarPoint: grammarUpdateAdminMock,
+            deleteAdminGrammarPoint: grammarDeleteAdminMock,
           },
         },
         {
@@ -202,5 +210,105 @@ describe('GrammarService', () => {
     expect(progressUpdateMock).toHaveBeenCalled();
     expect(result.confidenceLevel).toBe(2);
     expect(result.reviewCount).toBe(3);
+  });
+
+  describe('admin CRUD', () => {
+    const adminCreateDto = {
+      pattern: '〜たい',
+      jlptLevel: JLPTLevel.N5,
+      title: 'Expressar desejo',
+      shortExplanation: 'Indica vontade de realizar uma ação.',
+    };
+
+    it('should create a grammar point when pattern does not exist', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue(null);
+      grammarCreateAdminMock.mockResolvedValue(detailFixture);
+
+      const result = await service.createAdminGrammarPoint(adminCreateDto);
+
+      expect(grammarFindByPatternAndJlptMock).toHaveBeenCalledWith(
+        adminCreateDto.pattern,
+        adminCreateDto.jlptLevel,
+      );
+      expect(grammarCreateAdminMock).toHaveBeenCalledWith(adminCreateDto);
+      expect(result.id).toBe(detailFixture.id);
+      expect(result.pattern).toBe(detailFixture.pattern);
+    });
+
+    it('should throw ConflictException when pattern already exists', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue(detailFixture);
+
+      await expect(
+        service.createAdminGrammarPoint(adminCreateDto),
+      ).rejects.toThrow(ConflictException);
+      expect(grammarCreateAdminMock).not.toHaveBeenCalled();
+    });
+
+    it('should update a grammar point when it exists', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue(null);
+      grammarUpdateAdminMock.mockResolvedValue({
+        ...detailFixture,
+        title: 'Título atualizado',
+      });
+
+      const result = await service.updateAdminGrammarPoint(detailFixture.id, {
+        title: 'Título atualizado',
+      });
+
+      expect(grammarUpdateAdminMock).toHaveBeenCalledWith(detailFixture.id, {
+        title: 'Título atualizado',
+      });
+      expect(result.title).toBe('Título atualizado');
+    });
+
+    it('should throw ConflictException when updating to a duplicate pattern', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue({
+        ...detailFixture,
+        id: 'another-grammar-id',
+      });
+
+      await expect(
+        service.updateAdminGrammarPoint(detailFixture.id, adminCreateDto),
+      ).rejects.toThrow(ConflictException);
+      expect(grammarUpdateAdminMock).not.toHaveBeenCalled();
+    });
+
+    it('should allow updating when duplicate lookup returns the same id', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue(detailFixture);
+      grammarUpdateAdminMock.mockResolvedValue(detailFixture);
+
+      const result = await service.updateAdminGrammarPoint(
+        detailFixture.id,
+        adminCreateDto,
+      );
+
+      expect(result.id).toBe(detailFixture.id);
+    });
+
+    it('should throw NotFoundException when updating a missing grammar point', async () => {
+      grammarFindByPatternAndJlptMock.mockResolvedValue(null);
+      grammarUpdateAdminMock.mockResolvedValue(null);
+
+      await expect(
+        service.updateAdminGrammarPoint('missing-id', adminCreateDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should delete a grammar point when it exists', async () => {
+      grammarDeleteAdminMock.mockResolvedValue(true);
+
+      await expect(
+        service.deleteAdminGrammarPoint(detailFixture.id),
+      ).resolves.toBeUndefined();
+      expect(grammarDeleteAdminMock).toHaveBeenCalledWith(detailFixture.id);
+    });
+
+    it('should throw NotFoundException when deleting a missing grammar point', async () => {
+      grammarDeleteAdminMock.mockResolvedValue(false);
+
+      await expect(
+        service.deleteAdminGrammarPoint('missing-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 });

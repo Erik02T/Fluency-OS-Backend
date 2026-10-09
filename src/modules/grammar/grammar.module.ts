@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { OptionalJwtMiddleware } from '../auth/middleware/optional-jwt.middleware';
+import { AdminGrammarController } from './admin-grammar.controller';
 import { GrammarController } from './grammar.controller';
 import { GrammarService } from './grammar.service';
 import {
@@ -10,7 +11,7 @@ import {
 
 @Module({
   imports: [AuthModule],
-  controllers: [GrammarController],
+  controllers: [GrammarController, AdminGrammarController],
   providers: [
     GrammarService,
     GrammarRepository,
