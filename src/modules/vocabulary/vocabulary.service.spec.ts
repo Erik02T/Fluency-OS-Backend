@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JLPTLevel, UserVocabularyProgress } from '@prisma/client';
+import { JLPTLevel, UserVocabularyProgress, Prisma } from '@prisma/client';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { VocabularyService } from './vocabulary.service';
+import { SrsService } from '../review/srs.service';
 import {
   UserVocabularyProgressRepository,
   VocabularyRepository,
@@ -108,6 +109,7 @@ describe('VocabularyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VocabularyService,
+        SrsService,
         {
           provide: VocabularyRepository,
           useValue: {
@@ -296,6 +298,67 @@ describe('VocabularyService', () => {
       await expect(service.deleteAdminVocabulary('missing-id')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('review progress uses documented SM-2 via SrsService', () => {
+    const setupProgress = (overrides: Record<string, unknown>) => {
+      vocabFindByIdFullMock.mockResolvedValue(detailFixture);
+      progressFindByUserAndVocabularyMock.mockResolvedValue({
+        ...mockProgress,
+        ...overrides,
+      });
+      progressUpdateMock.mockImplementation(
+        (
+          _userId: string,
+          _vocabularyId: string,
+          data: Prisma.UserVocabularyProgressUpdateInput,
+        ) =>
+          Promise.resolve({
+            ...mockProgress,
+            ...overrides,
+            srsLevel: data.srsLevel as number,
+            easeFactor: data.easeFactor as number,
+            intervalDays: data.intervalDays as number,
+            nextReviewAt: data.nextReviewAt as Date,
+            lastReviewAt: new Date(),
+            totalReviews: data.totalReviews as number,
+            correctReviews: data.correctReviews as number,
+            isMastered: data.isMastered as boolean,
+            masteredAt: data.masteredAt as Date | null,
+          } as never),
+      );
+    };
+
+    it('applies quality 2 (OK) when correct: true', async () => {
+      setupProgress({});
+
+      const result = await service.updateProgress('user-123', 'vocab-123', {
+        action: 'review',
+        correct: true,
+      });
+
+      // SM-2 quality 2: level 3→4, interval ceil(4 × 2.5) = 10
+      expect(result.srsLevel).toBe(4);
+      expect(result.intervalDays).toBe(10);
+      expect(result.easeFactor).toBe(2.5);
+      expect(result.totalReviews).toBe(3);
+      expect(result.correctReviews).toBe(3);
+    });
+
+    it('applies quality 0 (fail) when correct: false', async () => {
+      setupProgress({ srsLevel: 4, intervalDays: 10 });
+
+      const result = await service.updateProgress('user-123', 'vocab-123', {
+        action: 'review',
+        correct: false,
+      });
+
+      // SM-2 quality 0: level 4→3, interval reseta para 1
+      expect(result.srsLevel).toBe(3);
+      expect(result.intervalDays).toBe(1);
+      expect(result.totalReviews).toBe(3);
+      expect(result.correctReviews).toBe(2);
     });
   });
 });

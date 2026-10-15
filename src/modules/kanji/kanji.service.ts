@@ -21,12 +21,14 @@ import {
   UserKanjiProgressEntity,
 } from './types/kanji.types';
 import { logStructured } from '../../common/logging/structured-log';
+import { SrsService } from '../review/srs.service';
 
 @Injectable()
 export class KanjiService {
   constructor(
     private kanjiRepository: KanjiRepository,
     private userProgressRepository: UserKanjiProgressRepository,
+    private readonly srsService: SrsService,
   ) {}
 
   /**
@@ -276,30 +278,37 @@ export class KanjiService {
     return this.toProgressDto(kanjiId, updated);
   }
 
+  /**
+   * Regra de revisao do progresso - SM-2 adaptado (fonte autoritativa:
+   * docs/architecture.md + fluency-os-backend-spec.md RN-SRS001..008),
+   * delegada ao SrsService para garantir UMA unica implementacao do
+   * algoritmo em todo o backend (review sessions e progress endpoints).
+   *
+   * Mapeamento do contrato booleano legado para as qualidades SM-2:
+   *   correct: true  -> quality 2 (acertou com dificuldade)
+   *   correct: false -> quality 0 (falhou / reset do ciclo)
+   */
   private buildReviewUpdate(
     progress: UserKanjiProgressEntity,
     correct: boolean,
   ): Prisma.UserKanjiProgressUpdateInput {
     const now = new Date();
-    const nextSrsLevel = correct
-      ? Math.min(progress.srsLevel + 1, 10)
-      : Math.max(progress.srsLevel - 1, 1);
-    const nextIntervalDays = correct
-      ? Math.min(Math.max(progress.intervalDays * 2, 1), 365)
-      : 1;
-    const nextReviewAt = new Date(now);
-    nextReviewAt.setDate(nextReviewAt.getDate() + nextIntervalDays);
-    const isMastered = nextSrsLevel >= 5;
+    const srs = this.srsService.calculateNextReview(
+      progress,
+      correct ? 2 : 0,
+      now,
+    );
 
     return {
-      srsLevel: nextSrsLevel,
-      intervalDays: nextIntervalDays,
-      nextReviewAt,
+      srsLevel: srs.newSrsLevel,
+      easeFactor: srs.newEaseFactor,
+      intervalDays: srs.newIntervalDays,
+      nextReviewAt: srs.nextReviewAt,
       lastReviewAt: now,
       totalReviews: progress.totalReviews + 1,
       correctReviews: progress.correctReviews + (correct ? 1 : 0),
-      isMastered,
-      masteredAt: isMastered ? (progress.masteredAt ?? now) : null,
+      isMastered: srs.isMastered,
+      masteredAt: srs.isMastered ? (progress.masteredAt ?? now) : null,
     };
   }
 
