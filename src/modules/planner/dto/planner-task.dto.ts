@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -10,72 +11,51 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import {
   PlannerCategory,
   PlannerTaskPriority,
   PlannerTaskStatus,
 } from '@prisma/client';
 
+export const PLANNER_CATEGORIES = Object.values(PlannerCategory);
+export const PLANNER_PRIORITIES = Object.values(PlannerTaskPriority);
+export const PLANNER_STATUSES = Object.values(PlannerTaskStatus);
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^\d{2}:\d{2}$/;
+
 export class CreatePlannerTaskDto {
-  @ApiProperty({
-    description: 'Título da tarefa',
-    example: 'Revisar 20 kanjis do N4',
-  })
+  @ApiProperty({ example: 'Revisar 10 kanjis do N5' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(1)
   @MaxLength(300)
   title!: string;
 
-  @ApiPropertyOptional({
-    description: 'Descrição ou anotações adicionais',
-    example: 'Focar nos kanjis com taxa de erro maior',
-  })
+  @ApiPropertyOptional({ example: 'Foco em leitura e escrita' })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
   description?: string;
 
-  @ApiPropertyOptional({
-    description: 'Categoria da tarefa',
-    enum: PlannerCategory,
-    default: PlannerCategory.GENERAL,
-    example: PlannerCategory.KANJI,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_CATEGORIES, example: 'KANJI' })
   @IsOptional()
-  @IsEnum(PlannerCategory)
+  @IsIn(PLANNER_CATEGORIES)
   category?: PlannerCategory;
 
   @ApiProperty({
-    description: 'Data de execução da tarefa (formato YYYY-MM-DD)',
-    example: '2026-08-27',
+    example: '2026-10-10',
+    description: 'YYYY-MM-DD no timezone do usuário',
   })
-  @IsString()
-  @IsNotEmpty()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'date deve estar no formato YYYY-MM-DD',
-  })
+  @Matches(DATE_PATTERN, { message: 'date must be a YYYY-MM-DD string' })
   date!: string;
 
-  @ApiPropertyOptional({
-    description: 'Horário agendado (formato HH:mm)',
-    example: '09:00',
-  })
+  @ApiPropertyOptional({ example: '19:30', description: 'HH:mm' })
   @IsOptional()
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
-    message: 'scheduledTime deve estar no formato HH:mm (24h)',
-  })
+  @Matches(TIME_PATTERN, { message: 'scheduledTime must be a HH:mm string' })
   scheduledTime?: string;
 
-  @ApiPropertyOptional({
-    description: 'Duração estimada em minutos',
-    example: 25,
-    default: 15,
-  })
+  @ApiPropertyOptional({ minimum: 1, maximum: 720, example: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -83,67 +63,42 @@ export class CreatePlannerTaskDto {
   @Max(720)
   estimatedMinutes?: number;
 
-  @ApiPropertyOptional({
-    description: 'Prioridade da tarefa',
-    enum: PlannerTaskPriority,
-    default: PlannerTaskPriority.MEDIUM,
-    example: PlannerTaskPriority.HIGH,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_PRIORITIES, example: 'MEDIUM' })
   @IsOptional()
-  @IsEnum(PlannerTaskPriority)
+  @IsIn(PLANNER_PRIORITIES)
   priority?: PlannerTaskPriority;
 }
 
 export class UpdatePlannerTaskDto {
-  @ApiPropertyOptional({
-    description: 'Título da tarefa',
-    example: 'Revisar 25 kanjis do N4',
-  })
+  @ApiPropertyOptional({ example: 'Revisar 10 kanjis do N5' })
   @IsOptional()
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(300)
   title?: string;
 
-  @ApiPropertyOptional({
-    description: 'Descrição ou anotações adicionais',
-  })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(2000)
   description?: string;
 
-  @ApiPropertyOptional({
-    description: 'Categoria da tarefa',
-    enum: PlannerCategory,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_CATEGORIES })
   @IsOptional()
-  @IsEnum(PlannerCategory)
+  @IsIn(PLANNER_CATEGORIES)
   category?: PlannerCategory;
 
-  @ApiPropertyOptional({
-    description: 'Data de execução (YYYY-MM-DD)',
-  })
+  @ApiPropertyOptional({ example: '2026-10-10' })
   @IsOptional()
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'date deve estar no formato YYYY-MM-DD',
-  })
+  @Matches(DATE_PATTERN, { message: 'date must be a YYYY-MM-DD string' })
   date?: string;
 
-  @ApiPropertyOptional({
-    description: 'Horário agendado (HH:mm)',
-  })
+  @ApiPropertyOptional({ example: '19:30' })
   @IsOptional()
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
-    message: 'scheduledTime deve estar no formato HH:mm (24h)',
-  })
+  @Matches(TIME_PATTERN, { message: 'scheduledTime must be a HH:mm string' })
   scheduledTime?: string;
 
-  @ApiPropertyOptional({
-    description: 'Duração estimada em minutos',
-  })
+  @ApiPropertyOptional({ minimum: 1, maximum: 720 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -151,9 +106,7 @@ export class UpdatePlannerTaskDto {
   @Max(720)
   estimatedMinutes?: number;
 
-  @ApiPropertyOptional({
-    description: 'Duração real em minutos',
-  })
+  @ApiPropertyOptional({ minimum: 0, maximum: 720 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -161,36 +114,28 @@ export class UpdatePlannerTaskDto {
   @Max(720)
   actualMinutes?: number;
 
-  @ApiPropertyOptional({
-    description: 'Prioridade da tarefa',
-    enum: PlannerTaskPriority,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_PRIORITIES })
   @IsOptional()
-  @IsEnum(PlannerTaskPriority)
+  @IsIn(PLANNER_PRIORITIES)
   priority?: PlannerTaskPriority;
 
-  @ApiPropertyOptional({
-    description: 'Status da tarefa',
-    enum: PlannerTaskStatus,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_STATUSES })
   @IsOptional()
-  @IsEnum(PlannerTaskStatus)
+  @IsIn(PLANNER_STATUSES)
   status?: PlannerTaskStatus;
 }
 
-export class TogglePlannerTaskDto {
+export class CompletePlannerTaskDto {
   @ApiPropertyOptional({
     description:
-      'Forçar status específico (true para concluída, false para pendente)',
+      'Estado desejado. Omitido = toggle. Concluir uma tarefa já concluída é idempotente (sem histórico novo).',
+    example: true,
   })
   @IsOptional()
   @IsBoolean()
   completed?: boolean;
 
-  @ApiPropertyOptional({
-    description: 'Minutos reais gastos na execução da tarefa',
-    example: 30,
-  })
+  @ApiPropertyOptional({ minimum: 0, maximum: 720, example: 25 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -199,75 +144,29 @@ export class TogglePlannerTaskDto {
   actualMinutes?: number;
 }
 
-export class GetPlannerTasksQueryDto {
-  @ApiPropertyOptional({
-    description: 'Filtrar por data específica (YYYY-MM-DD)',
-    example: '2026-08-27',
-  })
+export class PlannerTasksQueryDto {
+  @ApiPropertyOptional({ example: '2026-10-10', description: 'YYYY-MM-DD' })
   @IsOptional()
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'date deve estar no formato YYYY-MM-DD',
-  })
+  @Matches(DATE_PATTERN, { message: 'date must be a YYYY-MM-DD string' })
   date?: string;
 
-  @ApiPropertyOptional({
-    description: 'Data de início do período (YYYY-MM-DD)',
-    example: '2026-08-24',
-  })
+  @ApiPropertyOptional({ example: '2026-10-05' })
   @IsOptional()
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'startDate deve estar no formato YYYY-MM-DD',
-  })
+  @Matches(DATE_PATTERN, { message: 'startDate must be a YYYY-MM-DD string' })
   startDate?: string;
 
-  @ApiPropertyOptional({
-    description: 'Data de fim do período (YYYY-MM-DD)',
-    example: '2026-08-30',
-  })
+  @ApiPropertyOptional({ example: '2026-10-11' })
   @IsOptional()
-  @IsString()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
-    message: 'endDate deve estar no formato YYYY-MM-DD',
-  })
+  @Matches(DATE_PATTERN, { message: 'endDate must be a YYYY-MM-DD string' })
   endDate?: string;
 
-  @ApiPropertyOptional({
-    description: 'Filtrar por status',
-    enum: PlannerTaskStatus,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_STATUSES })
   @IsOptional()
-  @IsEnum(PlannerTaskStatus)
+  @IsIn(PLANNER_STATUSES)
   status?: PlannerTaskStatus;
 
-  @ApiPropertyOptional({
-    description: 'Filtrar por categoria',
-    enum: PlannerCategory,
-  })
+  @ApiPropertyOptional({ enum: PLANNER_CATEGORIES })
   @IsOptional()
-  @IsEnum(PlannerCategory)
+  @IsIn(PLANNER_CATEGORIES)
   category?: PlannerCategory;
-}
-
-export interface PlannerTaskItemResponseDto {
-  id: string;
-  userId: string;
-  weeklyPlanId: string | null;
-  title: string;
-  description: string | null;
-  category: PlannerCategory;
-  categoryLabel: string;
-  kanjiGlyph: string;
-  date: string;
-  scheduledTime: string | null;
-  estimatedMinutes: number;
-  actualMinutes: number | null;
-  priority: PlannerTaskPriority;
-  status: PlannerTaskStatus;
-  completedAt: string | null;
-  isAutoGenerated: boolean;
-  actionPayload?: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
 }

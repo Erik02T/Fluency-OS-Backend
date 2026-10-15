@@ -1,218 +1,184 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ImmersionType, ImmersionLog } from '@prisma/client';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ImmersionType } from '@prisma/client';
 import { ImmersionService } from './immersion.service';
 import { ImmersionRepository } from './repositories';
-import { CreateImmersionLogDto, ImmersionLogFiltersDto } from './dto';
 
 describe('ImmersionService', () => {
   let service: ImmersionService;
+  const repository = {
+    findLogs: jest.fn(),
+    countLogs: jest.fn(),
+    findById: jest.fn(),
+    createLog: jest.fn(),
+    updateLog: jest.fn(),
+    deleteLog: jest.fn(),
+  };
 
-  const immersionCreateMock = jest.fn();
-  const immersionFindAllByUserMock = jest.fn();
-  const immersionCountByUserMock = jest.fn();
-
-  const now = new Date();
-
-  const mockImmersionLog: ImmersionLog = {
-    id: 'immersion-123',
+  const baseLog = {
+    id: 'log-1',
     userId: 'user-123',
     type: ImmersionType.ANIME,
-    title: 'Attack on Titan EP 1',
+    title: 'Shingeki no Kyojin',
     episode: 'EP 01',
-    durationMinutes: 24,
-    comprehension: 75,
+    durationMinutes: 25,
+    comprehension: 65,
     isActive: true,
-    notes: 'Muitos vocabulários novos de batalha',
-    loggedAt: now,
-    createdAt: now,
+    notes: null,
+    loggedAt: new Date('2026-10-10T12:00:00.000Z'),
+    createdAt: new Date('2026-10-10T12:00:00.000Z'),
   };
 
-  const createDto: CreateImmersionLogDto = {
-    type: ImmersionType.ANIME,
-    title: 'Attack on Titan EP 1',
-    durationMinutes: 24,
-    episode: 'EP 01',
-    comprehension: 75,
-    notes: 'Muitos vocabulários novos de batalha',
-  };
-
-  const filters: ImmersionLogFiltersDto = {
-    page: 1,
-    perPage: 10,
-  };
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ImmersionService,
-        {
-          provide: ImmersionRepository,
-          useValue: {
-            create: immersionCreateMock,
-            findAllByUser: immersionFindAllByUserMock,
-            countByUser: immersionCountByUserMock,
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get(ImmersionService);
+  beforeEach(() => {
     jest.clearAllMocks();
+    service = new ImmersionService(
+      repository as unknown as ImmersionRepository,
+    );
   });
 
-  it('deve criar um log de imersão com dados válidos', async () => {
-    immersionCreateMock.mockResolvedValue(mockImmersionLog);
+  describe('getLogs', () => {
+    it('aplica defaults de paginação e ordenação', async () => {
+      repository.findLogs.mockResolvedValue([baseLog]);
+      repository.countLogs.mockResolvedValue(1);
 
-    const result = await service.create('user-123', createDto);
+      const result = await service.getLogs('user-123', {});
 
-    expect(immersionCreateMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 'user-123',
+      expect(repository.findLogs).toHaveBeenCalledWith('user-123', {
+        type: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        sort: 'loggedAt',
+        order: 'desc',
+        skip: 0,
+        take: 20,
+      });
+      expect(result.pagination).toEqual({
+        page: 1,
+        perPage: 20,
+        total: 1,
+        pages: 1,
+      });
+      expect(result.data[0].loggedAt).toBe('2026-10-10T12:00:00.000Z');
+    });
+
+    it('calcula skip/pages a partir de page/perPage', async () => {
+      repository.findLogs.mockResolvedValue([]);
+      repository.countLogs.mockResolvedValue(120);
+
+      const result = await service.getLogs('user-123', {
+        page: 3,
+        perPage: 50,
+      });
+
+      expect(repository.findLogs).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({ skip: 100, take: 50 }),
+      );
+      expect(result.pagination.pages).toBe(3);
+    });
+
+    it('converte startDate/endDate em Date e valida o formato', async () => {
+      repository.findLogs.mockResolvedValue([]);
+      repository.countLogs.mockResolvedValue(0);
+
+      await service.getLogs('user-123', {
+        startDate: '2026-09-01T00:00:00.000Z',
+        endDate: '2026-10-10T23:59:59.000Z',
+      });
+
+      expect(repository.findLogs).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          startDate: new Date('2026-09-01T00:00:00.000Z'),
+          endDate: new Date('2026-10-10T23:59:59.000Z'),
+        }),
+      );
+
+      await expect(
+        service.getLogs('user-123', { startDate: 'not-a-date' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('createLog', () => {
+    it('faz trim e aplica defaults (isActive, loggedAt)', async () => {
+      repository.createLog.mockResolvedValue(baseLog);
+
+      await service.createLog('user-123', {
         type: ImmersionType.ANIME,
-        title: 'Attack on Titan EP 1',
-        durationMinutes: 24,
-      }),
-    );
-    expect(result.id).toBe('immersion-123');
-    expect(result.type).toBe(ImmersionType.ANIME);
-    expect(result.durationMinutes).toBe(24);
-    expect(result.userId).toBe('user-123');
-  });
+        title: '  Shingeki no Kyojin  ',
+        durationMinutes: 25,
+      });
 
-  it('deve criar log de imersão com data customizada', async () => {
-    const customDate = new Date('2024-06-15T19:00:00Z');
-    const logWithCustomDate: ImmersionLog = {
-      ...mockImmersionLog,
-      loggedAt: customDate,
-    };
-    immersionCreateMock.mockResolvedValue(logWithCustomDate);
-
-    const result = await service.create('user-123', {
-      ...createDto,
-      loggedAt: customDate,
+      expect(repository.createLog).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          type: ImmersionType.ANIME,
+          title: 'Shingeki no Kyojin',
+          durationMinutes: 25,
+          episode: null,
+          comprehension: null,
+          notes: null,
+          isActive: true,
+          loggedAt: expect.any(Date) as Date,
+        }),
+      );
     });
 
-    expect(immersionCreateMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        loggedAt: customDate,
-      }),
-    );
-    expect(result.loggedAt).toBe(customDate);
-  });
+    it('usa loggedAt informado quando válido', async () => {
+      repository.createLog.mockResolvedValue(baseLog);
 
-  it('deve criar log de imersão sem campos opcionais', async () => {
-    const minimalLog: ImmersionLog = {
-      id: 'immersion-456',
-      userId: 'user-123',
-      type: ImmersionType.PODCAST,
-      title: 'Japanese Podcast #42',
-      episode: null,
-      durationMinutes: 45,
-      comprehension: null,
-      isActive: true,
-      notes: null,
-      loggedAt: now,
-      createdAt: now,
-    };
-    immersionCreateMock.mockResolvedValue(minimalLog);
+      await service.createLog('user-123', {
+        type: ImmersionType.ANIME,
+        title: 'A',
+        durationMinutes: 10,
+        loggedAt: '2026-10-01T12:00:00.000Z',
+      });
 
-    const minimalDto: CreateImmersionLogDto = {
-      type: ImmersionType.PODCAST,
-      title: 'Japanese Podcast #42',
-      durationMinutes: 45,
-    };
-
-    const result = await service.create('user-123', minimalDto);
-
-    expect(result.id).toBe('immersion-456');
-    expect(result.episode).toBeNull();
-    expect(result.comprehension).toBeNull();
-    expect(result.notes).toBeNull();
-  });
-
-  it('deve listar logs paginados apenas do usuário autenticado', async () => {
-    const anotherLog: ImmersionLog = {
-      id: 'immersion-789',
-      userId: 'user-123',
-      type: ImmersionType.MANGA,
-      title: 'One Piece Cap 1000',
-      episode: 'Cap 1000',
-      durationMinutes: 30,
-      comprehension: 80,
-      isActive: true,
-      notes: null,
-      loggedAt: now,
-      createdAt: now,
-    };
-
-    immersionFindAllByUserMock.mockResolvedValue([
-      mockImmersionLog,
-      anotherLog,
-    ]);
-    immersionCountByUserMock.mockResolvedValue(2);
-
-    const result = await service.findAll('user-123', filters);
-
-    expect(immersionFindAllByUserMock).toHaveBeenCalledWith(
-      'user-123',
-      filters,
-    );
-    expect(result.data.length).toBe(2);
-    expect(result.data[0]?.userId).toBe('user-123');
-    expect(result.data[1]?.userId).toBe('user-123');
-    expect(result.pagination.total).toBe(2);
-    expect(result.pagination.page).toBe(1);
-    expect(result.pagination.perPage).toBe(10);
-    expect(result.pagination.pages).toBe(1);
-  });
-
-  it('deve aplicar filtro por tipo de atividade na listagem', async () => {
-    const filteredFilters: ImmersionLogFiltersDto = {
-      ...filters,
-      type: ImmersionType.ANIME,
-    };
-
-    immersionFindAllByUserMock.mockResolvedValue([mockImmersionLog]);
-    immersionCountByUserMock.mockResolvedValue(1);
-
-    const result = await service.findAll('user-123', filteredFilters);
-
-    expect(immersionFindAllByUserMock).toHaveBeenCalledWith(
-      'user-123',
-      filteredFilters,
-    );
-    expect(result.data.length).toBe(1);
-    expect(result.data[0]?.type).toBe(ImmersionType.ANIME);
-  });
-
-  it('deve retornar lista vazia quando usuário não possui logs', async () => {
-    immersionFindAllByUserMock.mockResolvedValue([]);
-    immersionCountByUserMock.mockResolvedValue(0);
-
-    const result = await service.findAll('user-123', filters);
-
-    expect(result.data.length).toBe(0);
-    expect(result.pagination.total).toBe(0);
-    expect(result.pagination.pages).toBe(0);
-  });
-
-  it('deve mapear corretamente todos os campos do DTO de resposta', async () => {
-    immersionCreateMock.mockResolvedValue(mockImmersionLog);
-
-    const result = await service.create('user-123', createDto);
-
-    expect(result).toMatchObject({
-      id: 'immersion-123',
-      userId: 'user-123',
-      type: ImmersionType.ANIME,
-      title: 'Attack on Titan EP 1',
-      episode: 'EP 01',
-      durationMinutes: 24,
-      comprehension: 75,
-      isActive: true,
-      notes: 'Muitos vocabulários novos de batalha',
+      expect(repository.createLog).toHaveBeenCalledWith(
+        'user-123',
+        expect.objectContaining({
+          loggedAt: new Date('2026-10-01T12:00:00.000Z'),
+        }),
+      );
     });
-    expect(result.loggedAt).toBeInstanceOf(Date);
-    expect(result.createdAt).toBeInstanceOf(Date);
+  });
+
+  describe('updateLog / deleteLog', () => {
+    it('lança 404 ao atualizar log inexistente', async () => {
+      repository.findById.mockResolvedValue(null);
+      await expect(
+        service.updateLog('user-123', 'missing', { title: 'X' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('atualiza campos parciais', async () => {
+      repository.findById.mockResolvedValue(baseLog);
+      repository.updateLog.mockResolvedValue({
+        ...baseLog,
+        durationMinutes: 30,
+      });
+
+      const result = await service.updateLog('user-123', 'log-1', {
+        durationMinutes: 30,
+      });
+
+      expect(repository.updateLog).toHaveBeenCalledWith('user-123', 'log-1', {
+        durationMinutes: 30,
+      });
+      expect(result.durationMinutes).toBe(30);
+    });
+
+    it('lança 404 ao remover log inexistente', async () => {
+      repository.deleteLog.mockResolvedValue(false);
+      await expect(
+        service.deleteLog('user-123', 'missing'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('remove log existente', async () => {
+      repository.deleteLog.mockResolvedValue(true);
+      const result = await service.deleteLog('user-123', 'log-1');
+      expect(result).toEqual({ success: true, id: 'log-1' });
+    });
   });
 });

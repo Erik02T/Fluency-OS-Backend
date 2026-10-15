@@ -1,15 +1,20 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
-import type {
-  AnalyticsGranularity,
-  AnalyticsPeriod,
-} from '../types/analytics.types';
 
-export class AnalyticsQueryDto {
-  @IsOptional()
-  @IsIn(['7d', '30d', '90d', 'all'])
-  period?: AnalyticsPeriod = '30d';
+export const ANALYTICS_PERIODS = ['7d', '30d', '90d', 'all'] as const;
+export type AnalyticsPeriod = (typeof ANALYTICS_PERIODS)[number];
 
+export const ANALYTICS_GRANULARITIES = ['day', 'week'] as const;
+export type AnalyticsGranularity = (typeof ANALYTICS_GRANULARITIES)[number];
+
+export class AnalyticsOverviewQueryDto {
+  @ApiPropertyOptional({ enum: ANALYTICS_PERIODS, example: '30d' })
   @IsOptional()
-  @IsIn(['day', 'week'])
-  granularity?: AnalyticsGranularity = 'day';
+  @IsIn(ANALYTICS_PERIODS)
+  period?: AnalyticsPeriod;
+
+  @ApiPropertyOptional({ enum: ANALYTICS_GRANULARITIES, example: 'day' })
+  @IsOptional()
+  @IsIn(ANALYTICS_GRANULARITIES)
+  granularity?: AnalyticsGranularity;
 }

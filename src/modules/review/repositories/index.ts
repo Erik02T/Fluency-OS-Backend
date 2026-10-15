@@ -1,2 +1,1 @@
-export * from './review-session.repository';
-export * from './review-answer.repository';
+export * from './review.repository';

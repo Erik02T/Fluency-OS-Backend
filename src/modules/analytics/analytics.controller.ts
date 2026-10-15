@@ -14,46 +14,41 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AnalyticsService } from './analytics.service';
-import { AnalyticsOverviewResponseDto, AnalyticsQueryDto } from './dto';
+import {
+  ANALYTICS_GRANULARITIES,
+  ANALYTICS_PERIODS,
+  AnalyticsOverviewQueryDto,
+  AnalyticsOverviewResponseDto,
+} from './dto';
 
 @ApiTags('Analytics')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('overview')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary:
-      'Obter séries históricas e resumo analítico do usuário autenticado',
-    description:
-      'Retorna agregações reais de estudo (kanji, vocab, gramática, imersão, streaks) organizadas por período e granularidade.',
+    summary: 'Overview analítico (resumo, série de estudo e imersão)',
   })
-  @ApiQuery({
-    name: 'period',
-    required: false,
-    enum: ['7d', '30d', '90d', 'all'],
-    description: 'Período histórico da série (padrão: 30d)',
-  })
+  @ApiQuery({ name: 'period', required: false, enum: ANALYTICS_PERIODS })
   @ApiQuery({
     name: 'granularity',
     required: false,
-    enum: ['day', 'week'],
-    description: 'Granularidade de agregação (padrão: day)',
+    enum: ANALYTICS_GRANULARITIES,
   })
   @ApiResponse({
     status: 200,
-    description: 'Dados analíticos agregados retornados com sucesso',
-    type: AnalyticsOverviewResponseDto,
+    description: 'Overview retornado com sucesso',
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   getOverview(
-    @Query() query: AnalyticsQueryDto,
+    @Query() query: AnalyticsOverviewQueryDto,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<AnalyticsOverviewResponseDto> {
     return this.analyticsService.getOverview(req.user!.id, query);

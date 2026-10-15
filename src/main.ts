@@ -6,8 +6,12 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())
+    : ['http://localhost:3000'];
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
   });
 
@@ -37,6 +41,12 @@ async function bootstrap() {
       'Vocabulary',
       'Banco de vocabulário com filtros, detalhe e progresso',
     )
+    .addTag('Grammar', 'Banco de gramática, exemplos e progresso')
+    .addTag('Review', 'Sessões de revisão espaçada (SRS SM-2)')
+    .addTag('Planner', 'Planejamento semanal, metas e tarefas diárias')
+    .addTag('Immersion', 'Logs e acompanhamento de imersão')
+    .addTag('Analytics', 'Métricas e séries temporais de aprendizado')
+    .addTag('Dashboard', 'Resumo agregado e status do aluno')
     .addTag('Health', 'Status da aplicação')
     .build();
 
