@@ -4,7 +4,7 @@ export class VocabularyListResponseDto {
   id!: string;
   word!: string;
   reading!: string;
-  jlpt!: JLPTLevel;
+  jlpt!: JLPTLevel | null;
   frequency!: number | null;
   partOfSpeech!: string | null;
   tags!: string[];
@@ -32,7 +32,7 @@ export class VocabularyDetailResponseDto {
   id!: string;
   word!: string;
   reading!: string;
-  jlpt!: JLPTLevel;
+  jlpt!: JLPTLevel | null;
   frequency!: number | null;
   partOfSpeech!: string | null;
   tags!: string[];

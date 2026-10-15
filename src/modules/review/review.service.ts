@@ -485,7 +485,7 @@ export class ReviewService {
       id: string;
       word: string;
       reading: string;
-      jlptLevel: string;
+      jlptLevel: string | null;
       partOfSpeech: string | null;
       meanings: { meaning: string }[];
     };

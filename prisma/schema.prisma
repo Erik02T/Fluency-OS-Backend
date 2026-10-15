@@ -392,10 +392,10 @@ model UserKanjiProgress {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model Vocabulary {
-  id           String    @id @default(cuid())
-  word         String    @db.VarChar(100)
-  reading      String    @db.VarChar(200) // leitura em hiragana/katakana
-  jlptLevel    JLPTLevel
+  id           String     @id @default(cuid())
+  word         String     @db.VarChar(100)
+  reading      String     @db.VarChar(200) // leitura em hiragana/katakana
+  jlptLevel    JLPTLevel? // nullable: bulk import pode não classificar o JLPT
   frequency    Int?
   partOfSpeech String?   @db.VarChar(50) // noun, verb (godan), verb (ichidan), adj-i, etc.
   tags         String[]  // categorias: ["daily", "formal", "anime", "business"]
