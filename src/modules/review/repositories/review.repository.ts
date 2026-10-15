@@ -32,7 +32,7 @@ export type DueVocabularyProgressWithRelations = UserVocabularyProgress & {
     id: string;
     word: string;
     reading: string;
-    jlptLevel: string;
+    jlptLevel: string | null;
     partOfSpeech: string | null;
     meanings: { meaning: string; isPrimary: boolean; position: number }[];
   };
