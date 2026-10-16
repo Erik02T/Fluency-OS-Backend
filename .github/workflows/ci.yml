@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - fix/**
+      - integration/**
   pull_request:
     branches:
       - main
@@ -92,6 +93,9 @@ jobs:
 
       - name: Unit tests
         run: npm test -- --runInBand
+
+      - name: Grammar tests (Vitest)
+        run: npm run grammar:test
 
       - name: E2E tests
         run: npm run test:e2e -- --runInBand
