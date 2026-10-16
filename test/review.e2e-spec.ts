@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -11,76 +10,58 @@ interface LoginResponseBody {
   user: {
     id: string;
     email: string;
-    role: Role;
   };
 }
 
 interface ReviewQueueResponseBody {
   total_due: number;
-  items: Array<{ progress_id: string }>;
-  by_type: {
-    kanji: number;
-    vocabulary: number;
-  };
-}
-
-interface ReviewQueueCountResponseBody {
-  kanji: number;
-  vocabulary: number;
-  total: number;
+  items: Array<{
+    progress_id: string;
+    item_type: string;
+    item: { id: string; character?: string; word?: string };
+    srs_level: number;
+    last_reviewed_at: string | null;
+    next_review_at: string;
+    review_count: number;
+  }>;
+  by_type: { kanji: number; vocabulary: number; grammar: number };
 }
 
 interface ReviewSessionResponseBody {
   id: string;
   user_id: string;
-  status: string;
   session_type: string;
+  status: string;
   total_items: number;
   reviewed_items: number;
   correct_items: number;
   incorrect_items: number;
-  accuracy_rate?: number | null;
-  duration_seconds?: number | null;
-}
-
-interface ReviewAnswerResponseBody {
-  previous_srs_level: number;
-  new_srs_level: number;
-  previous_interval: number;
-  new_interval: number;
-  next_review_at: string;
-  is_mastered: boolean;
-  session_progress: {
-    reviewed: number;
-    total: number;
-    correct: number;
-    incorrect: number;
-  };
+  accuracy_rate: number | null;
+  duration_seconds: number | null;
+  started_at: string;
+  completed_at: string | null;
+  answers?: Array<{
+    id: string;
+    item_type: string;
+    item_id: string;
+    quality: number;
+    quality_name: string;
+    srs_level_before: number;
+    srs_level_after: number;
+  }>;
 }
 
 interface ReviewStatsResponseBody {
   session_id: string;
   status: string;
-  total_items: number;
   reviewed_items: number;
   correct_items: number;
-  incorrect_items: number;
   accuracy_rate: number;
-  duration_seconds: number;
   quality_breakdown: {
     blackout: number;
     wrong: number;
     correct_hard: number;
     correct_easy: number;
-  };
-}
-
-interface PaginatedHistoryResponseBody {
-  data: Array<{ id: string }>;
-  pagination: {
-    page: number;
-    perPage: number;
-    total: number;
   };
 }
 
@@ -95,7 +76,7 @@ function assertLoginResponse(body: unknown): asserts body is LoginResponseBody {
   }
 }
 
-function assertReviewQueueResponse(
+function assertQueueBody(
   body: unknown,
 ): asserts body is ReviewQueueResponseBody {
   if (
@@ -109,21 +90,7 @@ function assertReviewQueueResponse(
   }
 }
 
-function assertReviewQueueCountResponse(
-  body: unknown,
-): asserts body is ReviewQueueCountResponseBody {
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('kanji' in body) ||
-    !('vocabulary' in body) ||
-    !('total' in body)
-  ) {
-    throw new Error('Invalid review queue count response body');
-  }
-}
-
-function assertReviewSessionResponse(
+function assertSessionBody(
   body: unknown,
 ): asserts body is ReviewSessionResponseBody {
   if (
@@ -136,7 +103,34 @@ function assertReviewSessionResponse(
   }
 }
 
-function assertReviewAnswerResponse(
+function assertStatsBody(
+  body: unknown,
+): asserts body is ReviewStatsResponseBody {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('session_id' in body) ||
+    !('quality_breakdown' in body)
+  ) {
+    throw new Error('Invalid review stats response body');
+  }
+}
+
+interface ReviewAnswerResponseBody {
+  previous_srs_level: number;
+  new_srs_level: number;
+  previous_interval: number;
+  new_interval: number;
+  is_mastered: boolean;
+  session_progress: {
+    reviewed: number;
+    total: number;
+    correct: number;
+    incorrect: number;
+  };
+}
+
+function assertAnswerBody(
   body: unknown,
 ): asserts body is ReviewAnswerResponseBody {
   if (
@@ -150,22 +144,14 @@ function assertReviewAnswerResponse(
   }
 }
 
-function assertReviewStatsResponse(
-  body: unknown,
-): asserts body is ReviewStatsResponseBody {
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('session_id' in body) ||
-    !('quality_breakdown' in body)
-  ) {
-    throw new Error('Invalid review stats response body');
-  }
+interface ReviewHistoryResponseBody {
+  data: Array<{ status: string }>;
+  pagination: { page: number; perPage: number; total: number; pages: number };
 }
 
-function assertPaginatedHistoryResponse(
+function assertHistoryBody(
   body: unknown,
-): asserts body is PaginatedHistoryResponseBody {
+): asserts body is ReviewHistoryResponseBody {
   if (
     typeof body !== 'object' ||
     body === null ||
@@ -173,22 +159,28 @@ function assertPaginatedHistoryResponse(
     !('pagination' in body) ||
     !Array.isArray((body as { data?: unknown }).data)
   ) {
-    throw new Error('Invalid paginated history response body');
+    throw new Error('Invalid review history response body');
   }
 }
 
 describe('Review E2E', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
+  let accessToken = '';
+  let userId = '';
+  let otherAccessToken = '';
+  let kanjiId = '';
+  let vocabId = '';
+  let suspendedKanjiId = '';
+  let futureVocabId = '';
 
-  let studentAccessToken = '';
-  let studentUserId = '';
-  let createdKanjiId = '';
-  let createdSessionId = '';
-
-  const studentEmail = `review-student-${Date.now()}@example.com`;
+  const email = `review-student-${Date.now()}@example.com`;
+  const otherEmail = `review-other-${Date.now()}@example.com`;
   const password = 'SecurePass123';
-  const testCharacter = `R${Date.now().toString(36).slice(-3)}`;
+  const uniqueSuffix = Date.now().toString(36);
+
+  const dueDate = new Date(Date.now() - 60 * 60 * 1000);
+  const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -205,239 +197,27 @@ describe('Review E2E', () => {
     );
 
     await app.init();
-
     prisma = app.get(PrismaService);
 
-    // Cria usuário comum
     await request(app.getHttpServer()).post('/auth/register').send({
-      email: studentEmail,
+      email,
       password,
       name: 'Review Student',
     });
 
-    const studentLogin = await request(app.getHttpServer())
+    const login = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ email: studentEmail, password })
+      .send({ email, password })
       .expect(200);
 
-    assertLoginResponse(studentLogin.body);
-    studentAccessToken = studentLogin.body.accessToken;
-    studentUserId = studentLogin.body.user.id;
-  });
+    assertLoginResponse(login.body);
+    accessToken = login.body.accessToken;
+    userId = login.body.user.id;
 
-  afterAll(async () => {
-    if (createdSessionId) {
-      await prisma.reviewAnswer.deleteMany({
-        where: { sessionId: createdSessionId },
-      });
-      await prisma.reviewSession.deleteMany({
-        where: { id: createdSessionId },
-      });
-    }
-
-    if (createdKanjiId) {
-      await prisma.userKanjiProgress.deleteMany({
-        where: { userId: studentUserId, kanjiId: createdKanjiId },
-      });
-      await prisma.kanji.deleteMany({ where: { id: createdKanjiId } });
-    }
-
-    await prisma.user.deleteMany({
-      where: { email: studentEmail },
-    });
-    await app.close();
-  });
-
-  it('cria kanji via admin e adiciona ao progresso do usuário', async () => {
-    // Cria kanji via prisma direto (sem depender de admin)
-    const kanji = await prisma.kanji.create({
-      data: {
-        character: testCharacter,
-        jlptLevel: 'N5',
-        grade: 1,
-        strokeCount: 4,
-        frequency: 1,
-        meanings: {
-          create: [{ meaning: 'teste', language: 'pt', isPrimary: true }],
-        },
-        readings: {
-          create: [{ reading: 'テスト', type: 'ONYOMI' }],
-        },
-      },
-    });
-    createdKanjiId = kanji.id;
-
-    // Adiciona ao progresso do usuário com nextReviewAt no passado (vencido)
-    await prisma.userKanjiProgress.create({
-      data: {
-        userId: studentUserId,
-        kanjiId: kanji.id,
-        srsLevel: 2,
-        easeFactor: 2.5,
-        intervalDays: 6,
-        nextReviewAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // vencido
-        lastReviewAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        totalReviews: 3,
-        correctReviews: 2,
-      },
-    });
-  });
-
-  it('GET /review/queue retorna itens vencidos', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/review/queue')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertReviewQueueResponse(response.body);
-    expect(response.body.total_due).toBeGreaterThanOrEqual(1);
-    expect(Array.isArray(response.body.items)).toBe(true);
-    expect(response.body.by_type.kanji).toBeGreaterThanOrEqual(1);
-    expect(response.body.by_type.vocabulary).toBeGreaterThanOrEqual(0);
-  });
-
-  it('GET /review/queue/count retorna contagem', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/review/queue/count')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertReviewQueueCountResponse(response.body);
-    expect(response.body.total).toBeGreaterThanOrEqual(1);
-    expect(response.body.kanji).toBeGreaterThanOrEqual(1);
-  });
-
-  it('POST /review/sessions cria sessão in_progress', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/review/sessions')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .send({ session_type: 'kanji' })
-      .expect(201);
-
-    assertReviewSessionResponse(response.body);
-    expect(response.body.status).toBe('in_progress');
-    expect(response.body.session_type).toBe('kanji');
-    expect(response.body.reviewed_items).toBe(0);
-    expect(response.body.correct_items).toBe(0);
-    expect(response.body.incorrect_items).toBe(0);
-
-    createdSessionId = response.body.id;
-  });
-
-  it('GET /review/sessions/:id retorna sessão', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertReviewSessionResponse(response.body);
-    expect(response.body.id).toBe(createdSessionId);
-    expect(response.body.user_id).toBe(studentUserId);
-    expect(response.body.status).toBe('in_progress');
-  });
-
-  it('POST /review/sessions/:id/answer registra resposta e atualiza SRS', async () => {
-    const response = await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/answer`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .send({
-        item_id: createdKanjiId,
-        item_type: 'kanji',
-        answer_quality: 2,
-        response_time_ms: 2500,
-      })
-      .expect(200);
-
-    assertReviewAnswerResponse(response.body);
-    expect(response.body.previous_srs_level).toBe(2);
-    expect(response.body.new_srs_level).toBe(3);
-    expect(response.body.session_progress.reviewed).toBe(1);
-    expect(response.body.session_progress.correct).toBe(1);
-    expect(response.body.session_progress.incorrect).toBe(0);
-  });
-
-  it('POST /review/sessions/:id/answer rejeita resposta duplicada', async () => {
-    await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/answer`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .send({
-        item_id: createdKanjiId,
-        item_type: 'kanji',
-        answer_quality: 3,
-      })
-      .expect(409);
-  });
-
-  it('POST /review/sessions/:id/end finaliza sessão', async () => {
-    const response = await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/end`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertReviewSessionResponse(response.body);
-    expect(response.body.id).toBe(createdSessionId);
-    expect(response.body.status).toBe('completed');
-    expect(response.body.accuracy_rate).toBeDefined();
-    expect(response.body.duration_seconds).toBeDefined();
-  });
-
-  it('GET /review/sessions/:id/stats retorna estatísticas', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}/stats`)
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertReviewStatsResponse(response.body);
-    expect(response.body.session_id).toBe(createdSessionId);
-    expect(response.body.status).toBe('completed');
-    expect(response.body.reviewed_items).toBe(1);
-    expect(response.body.correct_items).toBe(1);
-    expect(response.body.incorrect_items).toBe(0);
-    expect(response.body.quality_breakdown.correct_hard).toBe(1);
-  });
-
-  it('GET /review/sessions/history retorna histórico paginado', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/review/sessions/history?page=1&perPage=20')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
-      .expect(200);
-
-    assertPaginatedHistoryResponse(response.body);
-    expect(response.body.pagination).toMatchObject({
-      page: 1,
-      perPage: 20,
-    });
-    expect(response.body.data.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('bloqueia acesso sem autenticação', async () => {
-    await request(app.getHttpServer()).get('/review/queue').expect(401);
-    await request(app.getHttpServer()).get('/review/queue/count').expect(401);
-    await request(app.getHttpServer()).post('/review/sessions').expect(401);
-    await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}`)
-      .expect(401);
-    await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/answer`)
-      .expect(401);
-    await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/end`)
-      .expect(401);
-    await request(app.getHttpServer())
-      .get('/review/sessions/history')
-      .expect(401);
-    await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}/stats`)
-      .expect(401);
-  });
-
-  it('bloqueia acesso a sessão de outro usuário', async () => {
-    // Cria segundo usuário
-    const otherEmail = `review-other-${Date.now()}@example.com`;
     await request(app.getHttpServer()).post('/auth/register').send({
       email: otherEmail,
       password,
-      name: 'Other User',
+      name: 'Review Other',
     });
 
     const otherLogin = await request(app.getHttpServer())
@@ -446,41 +226,403 @@ describe('Review E2E', () => {
       .expect(200);
 
     assertLoginResponse(otherLogin.body);
-    const otherToken = otherLogin.body.accessToken;
+    otherAccessToken = otherLogin.body.accessToken;
 
-    // Tenta acessar sessão do primeiro usuário
-    await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}`)
-      .set('Authorization', `Bearer ${otherToken}`)
-      .expect(403);
+    const kanji = await prisma.kanji.create({
+      data: {
+        character: `火-${uniqueSuffix}`.slice(0, 4),
+        jlptLevel: 'N5',
+        meanings: { create: [{ meaning: `fogo ${uniqueSuffix}` }] },
+        readings: {
+          create: [
+            { reading: 'カ', type: 'ONYOMI' },
+            { reading: 'ひ', type: 'KUNYOMI' },
+          ],
+        },
+      },
+    });
+    kanjiId = kanji.id;
 
+    // Progresso kanji vencido (srsLevel 3, ease 2.5, interval 4)
+    await prisma.userKanjiProgress.create({
+      data: {
+        userId,
+        kanjiId,
+        srsLevel: 3,
+        easeFactor: 2.5,
+        intervalDays: 4,
+        nextReviewAt: dueDate,
+        totalReviews: 5,
+        correctReviews: 4,
+      },
+    });
+
+    const suspendedKanji = await prisma.kanji.create({
+      data: {
+        character: `水-${uniqueSuffix}`.slice(0, 4),
+        jlptLevel: 'N5',
+        meanings: { create: [{ meaning: `água ${uniqueSuffix}` }] },
+        readings: { create: [{ reading: 'スイ', type: 'ONYOMI' }] },
+      },
+    });
+    suspendedKanjiId = suspendedKanji.id;
+
+    // Kanji suspenso — NÃO entra na fila
+    await prisma.userKanjiProgress.create({
+      data: {
+        userId,
+        kanjiId: suspendedKanjiId,
+        srsLevel: 1,
+        nextReviewAt: dueDate,
+        isSuspended: true,
+      },
+    });
+
+    // Vocabulário vencido (srsLevel 2, ease 2.5, interval 2)
+    const vocabulary = await prisma.vocabulary.create({
+      data: {
+        word: `食べる-${uniqueSuffix}`.slice(0, 20),
+        reading: 'たべる',
+        jlptLevel: 'N5',
+        partOfSpeech: 'verb',
+        meanings: {
+          create: [{ meaning: `comer ${uniqueSuffix}`, isPrimary: true }],
+        },
+      },
+    });
+    vocabId = vocabulary.id;
+
+    await prisma.userVocabularyProgress.create({
+      data: {
+        userId,
+        vocabularyId: vocabId,
+        srsLevel: 2,
+        easeFactor: 2.5,
+        intervalDays: 2,
+        nextReviewAt: dueDate,
+        totalReviews: 2,
+        correctReviews: 1,
+      },
+    });
+
+    // Vocabulário futuro — NÃO entra na fila
+    const futureVocab = await prisma.vocabulary.create({
+      data: {
+        word: `飲む-${uniqueSuffix}`.slice(0, 20),
+        reading: 'のむ',
+        jlptLevel: 'N5',
+        meanings: {
+          create: [{ meaning: `beber ${uniqueSuffix}`, isPrimary: true }],
+        },
+      },
+    });
+    futureVocabId = futureVocab.id;
+
+    await prisma.userVocabularyProgress.create({
+      data: {
+        userId,
+        vocabularyId: futureVocabId,
+        srsLevel: 1,
+        nextReviewAt: futureDate,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    const sessionIds = await prisma.reviewSession.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    await prisma.reviewAnswer.deleteMany({
+      where: { sessionId: { in: sessionIds.map((s) => s.id) } },
+    });
+    await prisma.reviewSession.deleteMany({ where: { userId } });
+    await prisma.userKanjiProgress.deleteMany({ where: { userId } });
+    await prisma.userVocabularyProgress.deleteMany({ where: { userId } });
+    await prisma.kanji.deleteMany({
+      where: { id: { in: [kanjiId, suspendedKanjiId] } },
+    });
+    await prisma.vocabulary.deleteMany({
+      where: { id: { in: [vocabId, futureVocabId] } },
+    });
+    await prisma.user.deleteMany({
+      where: { email: { in: [email, otherEmail] } },
+    });
+
+    await app.close();
+  });
+
+  it('retorna fila com itens vencidos excluindo suspensos e futuros', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/review/queue')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertQueueBody(response.body);
+    // 1 kanji vencido + 1 vocabulário vencido
+    expect(response.body.total_due).toBe(2);
+    expect(response.body.by_type).toEqual({
+      kanji: 1,
+      vocabulary: 1,
+      grammar: 0,
+    });
+
+    const itemIds = response.body.items.map((item) => item.item.id);
+    expect(itemIds).toContain(kanjiId);
+    expect(itemIds).toContain(vocabId);
+    expect(itemIds).not.toContain(suspendedKanjiId);
+    expect(itemIds).not.toContain(futureVocabId);
+
+    const kanjiItem = response.body.items.find(
+      (item) => item.item.id === kanjiId,
+    );
+    expect(kanjiItem?.item_type).toBe('kanji');
+    expect(kanjiItem?.srs_level).toBe(3);
+    expect(kanjiItem?.review_count).toBe(5);
+  });
+
+  it('retorna contagem da fila para o badge de revisão', async () => {
     await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/answer`)
-      .set('Authorization', `Bearer ${otherToken}`)
+      .get('/review/queue/count')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect({ kanji: 1, vocabulary: 1, total: 2 });
+  });
+
+  it('nega fila sem autenticação', async () => {
+    await request(app.getHttpServer()).get('/review/queue').expect(401);
+  });
+
+  it('executa fluxo completo com SM-2 verificado no banco', async () => {
+    // Cria sessão de kanji (apenas 1 kanji vencido do tipo)
+    const created = await request(app.getHttpServer())
+      .post('/review/sessions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ session_type: 'kanji' })
+      .expect(201);
+
+    assertSessionBody(created.body);
+    const sessionId: string = created.body.id;
+    expect(created.body.session_type).toBe('kanji');
+    expect(created.body.status).toBe('in_progress');
+    expect(created.body.total_items).toBe(1);
+
+    // quality 2 (OK): level 3→4, interval ceil(4×2.5)=10
+    const answered = await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
       .send({
-        item_id: createdKanjiId,
+        item_id: kanjiId,
+        item_type: 'kanji',
+        answer_quality: 2,
+        response_time_ms: 3200,
+      })
+      .expect(200);
+
+    assertAnswerBody(answered.body);
+    expect(answered.body.previous_srs_level).toBe(3);
+    expect(answered.body.new_srs_level).toBe(4);
+    expect(answered.body.previous_interval).toBe(4);
+    expect(answered.body.new_interval).toBe(10);
+    expect(answered.body.is_mastered).toBe(false);
+    expect(answered.body.session_progress).toEqual({
+      reviewed: 1,
+      total: 1,
+      correct: 1,
+      incorrect: 0,
+    });
+
+    // Valida persistência real no banco: progresso + resposta
+    const persistedProgress = await prisma.userKanjiProgress.findUnique({
+      where: { userId_kanjiId: { userId, kanjiId } },
+    });
+    expect(persistedProgress?.srsLevel).toBe(4);
+    expect(persistedProgress?.intervalDays).toBe(10);
+    expect(persistedProgress?.totalReviews).toBe(6);
+    expect(persistedProgress?.correctReviews).toBe(5);
+
+    const persistedAnswers = await prisma.reviewAnswer.findMany({
+      where: { sessionId },
+    });
+    expect(persistedAnswers).toHaveLength(1);
+    expect(persistedAnswers[0]).toMatchObject({
+      itemId: kanjiId,
+      quality: 'CORRECT_HARD',
+      srsLevelBefore: 3,
+      srsLevelAfter: 4,
+      intervalBefore: 4,
+      intervalAfter: 10,
+      responseTimeMs: 3200,
+    });
+  });
+
+  it('encerra sessão, retorna stats e rejeita end duplicado', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/review/sessions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ session_type: 'vocabulary' })
+      .expect(201);
+
+    assertSessionBody(created.body);
+    const sessionId: string = created.body.id;
+
+    // quality 1 (difícil) no vocabulário
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        item_id: vocabId,
+        item_type: 'vocabulary',
+        answer_quality: 1,
+        response_time_ms: 5000,
+      })
+      .expect(200);
+
+    const ended = await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/end`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertSessionBody(ended.body);
+    expect(ended.body.status).toBe('completed');
+    expect(ended.body.reviewed_items).toBe(1);
+    expect(ended.body.correct_items).toBe(0);
+    expect(ended.body.accuracy_rate).toBe(0);
+
+    const stats = await request(app.getHttpServer())
+      .get(`/review/sessions/${sessionId}/stats`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertStatsBody(stats.body);
+    expect(stats.body.reviewed_items).toBe(1);
+    expect(stats.body.accuracy_rate).toBe(0);
+    expect(stats.body.quality_breakdown).toMatchObject({
+      blackout: 0,
+      wrong: 1,
+      correct_hard: 0,
+      correct_easy: 0,
+    });
+
+    // end duplicado → 409
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/end`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(409);
+
+    // answer após end → 409
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        item_id: vocabId,
+        item_type: 'vocabulary',
+        answer_quality: 2,
+      })
+      .expect(409);
+  });
+
+  it('abandon preserva progresso e retorna 404 para item sem progresso', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/review/sessions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ session_type: 'vocabulary' })
+      .expect(201);
+
+    assertSessionBody(created.body);
+    const sessionId: string = created.body.id;
+
+    // Item existente no banco mas SEM linha de progresso do usuário → 404
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        item_id: 'cmx0000000000000000000000',
         item_type: 'kanji',
         answer_quality: 2,
       })
-      .expect(403);
+      .expect(404);
+
+    // quality inválida → 400
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        item_id: vocabId,
+        item_type: 'vocabulary',
+        answer_quality: 9,
+      })
+      .expect(400);
+
+    const abandoned = await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/abandon`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertSessionBody(abandoned.body);
+    expect(abandoned.body.status).toBe('abandoned');
+
+    // end após abandon → 409
+    await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/end`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(409);
+  });
+
+  it('retorna history paginado e nega acesso cruzado (IDOR)', async () => {
+    const history = await request(app.getHttpServer())
+      .get('/review/sessions/history?page=1&perPage=20')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertHistoryBody(history.body);
+    expect(Array.isArray(history.body.data)).toBe(true);
+    expect(history.body.data.length).toBeGreaterThanOrEqual(3);
+    expect(history.body.pagination).toMatchObject({ page: 1, perPage: 20 });
+
+    const filtered = await request(app.getHttpServer())
+      .get('/review/sessions/history?status=completed')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    assertHistoryBody(filtered.body);
+    expect(filtered.body.data.every((s) => s.status === 'completed')).toBe(
+      true,
+    );
+
+    const otherHistory = await request(app.getHttpServer())
+      .get('/review/sessions/history')
+      .set('Authorization', `Bearer ${otherAccessToken}`)
+      .expect(200);
+
+    assertHistoryBody(otherHistory.body);
+    expect(otherHistory.body.data).toEqual([]);
+  });
+
+  it('nega leitura de sessão de outro usuário (IDOR)', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/review/sessions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ session_type: 'kanji' })
+      .expect(201);
+
+    assertSessionBody(created.body);
 
     await request(app.getHttpServer())
-      .post(`/review/sessions/${createdSessionId}/end`)
-      .set('Authorization', `Bearer ${otherToken}`)
-      .expect(403);
+      .get(`/review/sessions/${created.body.id}`)
+      .set('Authorization', `Bearer ${otherAccessToken}`)
+      .expect(404);
 
     await request(app.getHttpServer())
-      .get(`/review/sessions/${createdSessionId}/stats`)
-      .set('Authorization', `Bearer ${otherToken}`)
-      .expect(403);
-
-    await prisma.user.deleteMany({ where: { email: otherEmail } });
+      .get(`/review/sessions/${created.body.id}/stats`)
+      .set('Authorization', `Bearer ${otherAccessToken}`)
+      .expect(404);
   });
 
   it('retorna 404 para sessão inexistente', async () => {
     await request(app.getHttpServer())
-      .get('/review/sessions/sessao-inexistente')
-      .set('Authorization', `Bearer ${studentAccessToken}`)
+      .get('/review/sessions/session-inexistente')
+      .set('Authorization', `Bearer ${accessToken}`)
       .expect(404);
   });
 });

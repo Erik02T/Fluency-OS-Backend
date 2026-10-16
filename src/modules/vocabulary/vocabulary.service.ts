@@ -1,16 +1,17 @@
 import {
-  ConflictException,
   Injectable,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
-  CreateVocabularyDto,
   UpdateVocabularyProgressDto,
   VocabularyDetailResponseDto,
   PaginatedVocabularyResponseDto,
   VocabularyFiltersDto,
   VocabularyListResponseDto,
   VocabularyProgressResponseDto,
+  CreateVocabularyDto,
   UpdateVocabularyDto,
 } from './dto';
 import {
@@ -23,12 +24,14 @@ import {
   VocabularyListInput,
 } from './types/vocabulary.types';
 import { logStructured } from '../../common/logging/structured-log';
+import { SrsService } from '../review/srs.service';
 
 @Injectable()
 export class VocabularyService {
   constructor(
     private readonly vocabularyRepository: VocabularyRepository,
     private readonly userVocabularyProgressRepository: UserVocabularyProgressRepository,
+    private readonly srsService: SrsService,
   ) {}
 
   async findAll(
@@ -82,6 +85,54 @@ export class VocabularyService {
     return this.toDetailDto(vocabulary, progress);
   }
 
+  async updateProgress(
+    userId: string,
+    vocabularyId: string,
+    dto: UpdateVocabularyProgressDto,
+  ): Promise<VocabularyProgressResponseDto> {
+    const vocabulary =
+      await this.vocabularyRepository.findByIdFull(vocabularyId);
+
+    if (!vocabulary) {
+      throw new NotFoundException(
+        `Vocabulary with id ${vocabularyId} not found`,
+      );
+    }
+
+    let progress =
+      await this.userVocabularyProgressRepository.findByUserAndVocabulary(
+        userId,
+        vocabularyId,
+      );
+
+    if (dto.action === 'study') {
+      if (!progress) {
+        progress = await this.userVocabularyProgressRepository.create(
+          userId,
+          vocabularyId,
+        );
+      }
+
+      return this.toProgressDto(vocabularyId, progress);
+    }
+
+    if (!progress) {
+      progress = await this.userVocabularyProgressRepository.create(
+        userId,
+        vocabularyId,
+      );
+    }
+
+    const updateData = this.buildReviewUpdate(progress, dto.correct === true);
+    const updated = await this.userVocabularyProgressRepository.update(
+      userId,
+      vocabularyId,
+      updateData,
+    );
+
+    return this.toProgressDto(vocabularyId, updated);
+  }
+
   async createAdminVocabulary(
     dto: CreateVocabularyDto,
   ): Promise<VocabularyDetailResponseDto> {
@@ -92,7 +143,6 @@ export class VocabularyService {
       {
         word: dto.word,
         reading: dto.reading,
-        jlptLevel: dto.jlptLevel,
       },
     );
 
@@ -137,7 +187,7 @@ export class VocabularyService {
       },
     );
 
-    if (dto.word !== undefined && dto.reading !== undefined) {
+    if (dto.word && dto.reading) {
       const existing = await this.vocabularyRepository.findByWordAndReading(
         dto.word,
         dto.reading,
@@ -196,62 +246,6 @@ export class VocabularyService {
         vocabularyId: id,
       },
     );
-  }
-
-  async updateProgress(
-    userId: string,
-    vocabularyId: string,
-    dto: UpdateVocabularyProgressDto,
-  ): Promise<VocabularyProgressResponseDto> {
-    const vocabulary =
-      await this.vocabularyRepository.findByIdFull(vocabularyId);
-
-    if (!vocabulary) {
-      throw new NotFoundException(
-        `Vocabulary with id ${vocabularyId} not found`,
-      );
-    }
-
-    let progress =
-      await this.userVocabularyProgressRepository.findByUserAndVocabulary(
-        userId,
-        vocabularyId,
-      );
-
-    if (dto.action === 'study') {
-      if (!progress) {
-        progress = await this.userVocabularyProgressRepository.create(
-          userId,
-          vocabularyId,
-        );
-      }
-
-      return this.toProgressDto(vocabularyId, progress);
-    }
-
-    // action === 'review'
-    // O item entra na fila IMEDIATAMENTE (nextReviewAt = now) para que
-    // apareça na fila de revisão sem esperar o próximo agendamento.
-    if (!progress) {
-      progress = await this.userVocabularyProgressRepository.create(
-        userId,
-        vocabularyId,
-      );
-    }
-
-    // Força a próxima revisão para agora para que o item apareça na fila.
-    progress = await this.userVocabularyProgressRepository.update(
-      userId,
-      vocabularyId,
-      {
-        nextReviewAt: new Date(),
-        lastReviewAt: new Date(),
-        totalReviews: { increment: 1 },
-        ...(dto.correct ? { correctReviews: { increment: 1 } } : {}),
-      },
-    );
-
-    return this.toProgressDto(vocabularyId, progress);
   }
 
   private toListDto(
@@ -345,6 +339,40 @@ export class VocabularyService {
       correctReviews: progress.correctReviews,
       addedAt: progress.addedAt,
       masteredAt: progress.masteredAt ?? undefined,
+    };
+  }
+
+  /**
+   * Regra de revisao do progresso - SM-2 adaptado (fonte autoritativa:
+   * docs/architecture.md + fluency-os-backend-spec.md RN-SRS001..008),
+   * delegada ao SrsService para garantir UMA unica implementacao do
+   * algoritmo em todo o backend (review sessions e progress endpoints).
+   *
+   * Mapeamento do contrato booleano legado para as qualidades SM-2:
+   *   correct: true  -> quality 2 (acertou com dificuldade)
+   *   correct: false -> quality 0 (falhou / reset do ciclo)
+   */
+  private buildReviewUpdate(
+    progress: UserVocabularyProgressEntity,
+    correct: boolean,
+  ): Prisma.UserVocabularyProgressUpdateInput {
+    const now = new Date();
+    const srs = this.srsService.calculateNextReview(
+      progress,
+      correct ? 2 : 0,
+      now,
+    );
+
+    return {
+      srsLevel: srs.newSrsLevel,
+      easeFactor: srs.newEaseFactor,
+      intervalDays: srs.newIntervalDays,
+      nextReviewAt: srs.nextReviewAt,
+      lastReviewAt: now,
+      totalReviews: progress.totalReviews + 1,
+      correctReviews: progress.correctReviews + (correct ? 1 : 0),
+      isMastered: srs.isMastered,
+      masteredAt: srs.isMastered ? (progress.masteredAt ?? now) : null,
     };
   }
 }

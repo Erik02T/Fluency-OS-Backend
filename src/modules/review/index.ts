@@ -1,6 +1,6 @@
-export * from './review.module';
-export * from './review.controller';
-export * from './services';
-export * from './repositories';
+export { ReviewModule } from './review.module';
+export { ReviewController } from './review.controller';
+export { ReviewService } from './review.service';
+export { SrsService } from './srs.service';
 export * from './dto';
-export * from './types/review.types';
+export * from './repositories';

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import { UserKanjiProgressEntity } from '../types/kanji.types';
 
@@ -76,23 +77,23 @@ export class UserKanjiProgressRepository {
       data: {
         userId,
         kanjiId,
-        srsLevel: 1,
+        srsLevel: 0,
         nextReviewAt: tomorrow,
       },
     });
   }
 
   /**
-   * Atualizar entrada de progresso
+   * Atualizar entrada de progresso existente
    * @param userId ID do usuário
    * @param kanjiId ID do kanji
-   * @param data Dados para atualizar
+   * @param data Dados a atualizar
    * @returns Progresso atualizado
    */
   async update(
     userId: string,
     kanjiId: string,
-    data: import('@prisma/client').Prisma.UserKanjiProgressUpdateInput,
+    data: Prisma.UserKanjiProgressUpdateInput,
   ): Promise<UserKanjiProgressEntity> {
     return this.prisma.userKanjiProgress.update({
       where: {
@@ -100,22 +101,5 @@ export class UserKanjiProgressRepository {
       },
       data,
     });
-  }
-
-  /**
-   * Criar ou ignorar se já existir (upsert idempotente)
-   * @param userId ID do usuário
-   * @param kanjiId ID do kanji
-   * @returns Progresso existente ou recém-criado
-   */
-  async upsert(
-    userId: string,
-    kanjiId: string,
-  ): Promise<UserKanjiProgressEntity> {
-    const existing = await this.findByUserAndKanji(userId, kanjiId);
-    if (existing) {
-      return existing;
-    }
-    return this.create(userId, kanjiId);
   }
 }

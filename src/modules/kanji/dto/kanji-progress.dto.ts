@@ -1,8 +1,12 @@
-import { IsIn } from 'class-validator';
+import { IsBoolean, IsIn, ValidateIf } from 'class-validator';
 
 export class UpdateKanjiProgressDto {
   @IsIn(['study', 'review'])
   action!: 'study' | 'review';
+
+  @ValidateIf((dto: UpdateKanjiProgressDto) => dto.action === 'review')
+  @IsBoolean()
+  correct?: boolean;
 }
 
 export class KanjiProgressResponseDto {

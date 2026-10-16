@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import type { UserKanjiProgress } from '@prisma/client';
-import { JLPTLevel, ReadingType } from '@prisma/client';
+import { JLPTLevel, ReadingType, Prisma } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 import { ConflictException } from '@nestjs/common';
 import { KanjiService } from './kanji.service';
+import { SrsService } from '../review/srs.service';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
 import type { KanjiFiltersDto } from './dto';
 import type { KanjiListEntity } from './types/kanji.types';
@@ -90,6 +91,7 @@ describe('KanjiService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         KanjiService,
+        SrsService,
         {
           provide: KanjiRepository,
           useValue: {
@@ -108,6 +110,8 @@ describe('KanjiService', () => {
           useValue: {
             findByUserAndKanjis: jest.fn(),
             findByUserAndKanji: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
           },
         },
       ],
@@ -334,6 +338,113 @@ describe('KanjiService', () => {
       await expect(service.deleteAdminKanji('missing-id')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('review progress uses documented SM-2 via SrsService', () => {
+    const progressFixture = {
+      id: 'progress-1',
+      userId: 'user-123',
+      kanjiId: 'kanji-1',
+      srsLevel: 3,
+      easeFactor: 2.5,
+      intervalDays: 4,
+      nextReviewAt: new Date(),
+      lastReviewAt: null,
+      totalReviews: 5,
+      correctReviews: 4,
+      isMastered: false,
+      isFavorite: false,
+      isSuspended: false,
+      addedAt: new Date(),
+      masteredAt: null,
+    };
+
+    const setupProgress = (overrides: Record<string, unknown>) => {
+      kanjiRepository.findByIdFull.mockResolvedValue({
+        id: 'kanji-1',
+        character: '火',
+        jlptLevel: JLPTLevel.N5,
+        grade: 1,
+        strokeCount: 1,
+        frequency: 1,
+        notes: null,
+        unicodeCodepoint: 'U+7121',
+        romanization: 'hi',
+        meanings: [],
+        readings: [],
+        examples: [],
+        radicals: [],
+        createdAt: new Date(),
+      });
+      userProgressRepository.findByUserAndKanji.mockResolvedValue({
+        ...progressFixture,
+        ...overrides,
+      });
+      userProgressRepository.update.mockImplementation(
+        (
+          _userId: string,
+          _kanjiId: string,
+          data: Prisma.UserKanjiProgressUpdateInput,
+        ) =>
+          Promise.resolve({
+            ...progressFixture,
+            ...overrides,
+            srsLevel: data.srsLevel as number,
+            easeFactor: data.easeFactor as number,
+            intervalDays: data.intervalDays as number,
+            nextReviewAt: data.nextReviewAt as Date,
+            lastReviewAt: new Date(),
+            totalReviews: data.totalReviews as number,
+            correctReviews: data.correctReviews as number,
+            isMastered: data.isMastered as boolean,
+            masteredAt: data.masteredAt as Date | null,
+          } as never),
+      );
+    };
+
+    it('applies quality 2 (OK) when correct: true', async () => {
+      setupProgress({});
+
+      const result = await service.updateProgress('user-123', 'kanji-1', {
+        action: 'review',
+        correct: true,
+      });
+
+      expect(result.srsLevel).toBe(4);
+      expect(result.intervalDays).toBe(10);
+      expect(result.easeFactor).toBe(2.5);
+      expect(result.isMastered).toBe(false);
+      expect(result.totalReviews).toBe(6);
+      expect(result.correctReviews).toBe(5);
+    });
+
+    it('applies quality 0 (fail) when correct: false', async () => {
+      setupProgress({ srsLevel: 4, intervalDays: 10 });
+
+      const result = await service.updateProgress('user-123', 'kanji-1', {
+        action: 'review',
+        correct: false,
+      });
+
+      expect(result.srsLevel).toBe(3);
+      expect(result.intervalDays).toBe(1);
+      expect(result.easeFactor).toBe(2.5);
+      expect(result.totalReviews).toBe(6);
+      expect(result.correctReviews).toBe(4);
+    });
+
+    it('marks as mastered when reaching srsLevel 5', async () => {
+      setupProgress({ srsLevel: 4, intervalDays: 10 });
+
+      const result = await service.updateProgress('user-123', 'kanji-1', {
+        action: 'review',
+        correct: true,
+      });
+
+      expect(result.srsLevel).toBe(5);
+      expect(result.isMastered).toBe(true);
+      expect(result.masteredAt).toBeTruthy();
     });
   });
 });

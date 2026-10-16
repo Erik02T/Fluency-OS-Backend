@@ -1,25 +1,32 @@
 import { ImmersionType } from '@prisma/client';
 
-export class ImmersionLogResponseDto {
-  id!: string;
-  userId!: string;
-  type!: ImmersionType;
-  title!: string;
-  episode!: string | null;
-  durationMinutes!: number;
-  comprehension!: number | null;
-  isActive!: boolean;
-  notes!: string | null;
-  loggedAt!: Date;
-  createdAt!: Date;
+export interface ImmersionLogResponseDto {
+  id: string;
+  userId: string;
+  type: ImmersionType;
+  title: string;
+  episode: string | null;
+  durationMinutes: number;
+  comprehension: number | null;
+  isActive: boolean;
+  notes: string | null;
+  loggedAt: string;
+  createdAt: string;
 }
 
-export class PaginatedImmersionLogResponseDto {
-  data!: ImmersionLogResponseDto[];
-  pagination!: {
-    page: number;
-    perPage: number;
-    total: number;
-    pages: number;
-  };
+export interface ImmersionPaginationDto {
+  page: number;
+  perPage: number;
+  total: number;
+  pages: number;
+}
+
+export interface PaginatedImmersionLogResponseDto {
+  data: ImmersionLogResponseDto[];
+  pagination: ImmersionPaginationDto;
+}
+
+export interface DeleteImmersionLogResponseDto {
+  success: boolean;
+  id: string;
 }

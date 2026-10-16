@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
-import { ReviewModule } from '../review/review.module';
-import { PrismaService } from '../auth/repositories/prisma.service';
 import { PlannerController } from './planner.controller';
 import { PlannerService } from './planner.service';
+import { PlannerRepository } from './repositories';
 
 @Module({
-  imports: [AuthModule, ReviewModule],
+  imports: [AuthModule],
   controllers: [PlannerController],
-  providers: [PlannerService, PrismaService],
+  providers: [PlannerService, PlannerRepository],
   exports: [PlannerService],
 })
 export class PlannerModule {}

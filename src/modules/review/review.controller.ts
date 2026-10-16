@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -15,12 +14,13 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
-import { ReviewService } from './services/review.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ReviewService } from './review.service';
 import {
   CreateReviewSessionDto,
   PaginatedReviewSessionResponseDto,
@@ -32,7 +32,6 @@ import {
   ReviewSessionStatsResponseDto,
   SubmitReviewAnswerDto,
 } from './dto';
-import { logStructured } from '../../common/logging/structured-log';
 
 @ApiTags('Review')
 @ApiBearerAuth('access-token')
@@ -41,214 +40,160 @@ import { logStructured } from '../../common/logging/structured-log';
 export class ReviewController {
   constructor(private readonly reviewService: ReviewService) {}
 
-  private getUserId(req: AuthRequest.AuthenticatedRequest): string {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw new BadRequestException('User not authenticated');
-    }
-    return userId;
-  }
-
-  /**
-   * GET /review/queue — Fila de revisão do dia
-   */
   @Get('queue')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obter fila de itens vencidos para revisão' })
+  @ApiOperation({ summary: 'Fila de itens vencidos para revisão' })
   @ApiResponse({
     status: 200,
     description: 'Fila de revisão retornada com sucesso',
-    type: ReviewQueueResponseDto,
   })
-  async getQueue(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  getQueue(
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewQueueResponseDto> {
-    const userId = this.getUserId(req);
-    logStructured('info', 'ReviewController', 'review.queue.request', {
-      userId,
-    });
-    return this.reviewService.getQueue(userId);
+    return this.reviewService.getQueue(req.user!.id);
   }
 
-  /**
-   * GET /review/queue/count — Contagem de itens na fila
-   */
   @Get('queue/count')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obter contagem de itens pendentes de revisão' })
+  @ApiOperation({ summary: 'Contagem de itens pendentes de revisão' })
   @ApiResponse({
     status: 200,
     description: 'Contagem retornada com sucesso',
-    type: ReviewQueueCountResponseDto,
   })
-  async getQueueCount(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  getQueueCount(
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewQueueCountResponseDto> {
-    const userId = this.getUserId(req);
-    return this.reviewService.getQueueCount(userId);
+    return this.reviewService.getQueueCount(req.user!.id);
   }
 
-  /**
-   * POST /review/sessions — Iniciar nova sessão de revisão
-   */
   @Post('sessions')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Iniciar uma nova sessão de revisão' })
+  @ApiOperation({ summary: 'Iniciar nova sessão de revisão' })
   @ApiResponse({
     status: 201,
-    description: 'Sessão de revisão criada com sucesso',
-    type: ReviewSessionResponseDto,
+    description: 'Sessão criada com sucesso',
   })
-  async createSession(
+  @ApiResponse({ status: 400, description: 'Payload inválido' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  createSession(
     @Body() dto: CreateReviewSessionDto,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewSessionResponseDto> {
-    const userId = this.getUserId(req);
-    logStructured('info', 'ReviewController', 'review.session.create.request', {
-      userId,
-      dto,
-    });
-    return this.reviewService.createSession(userId, dto);
+    return this.reviewService.createSession(req.user!.id, dto);
   }
 
-  /**
-   * GET /review/sessions/history — Histórico de sessões do usuário
-   */
+  // ATENÇÃO: deve permanecer antes de GET sessions/:id (contrato history)
   @Get('sessions/history')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Listar histórico de sessões do usuário autenticado',
+  @ApiOperation({ summary: 'Histórico de sessões do usuário' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'perPage', required: false, type: Number, example: 20 })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['in_progress', 'completed', 'abandoned'],
   })
   @ApiResponse({
     status: 200,
-    description: 'Histórico de sessões retornado com sucesso',
-    type: PaginatedReviewSessionResponseDto,
+    description: 'Histórico paginado retornado',
   })
-  async getHistory(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  getHistory(
     @Query() query: ReviewHistoryQueryDto,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<PaginatedReviewSessionResponseDto> {
-    const userId = this.getUserId(req);
-    logStructured('info', 'ReviewController', 'review.history.request', {
-      userId,
-      query,
-    });
-    return this.reviewService.getHistory(userId, query);
+    return this.reviewService.getHistory(req.user!.id, query);
   }
 
-  /**
-   * GET /review/sessions/:id/stats — Estatísticas de uma sessão
-   */
-  @Get('sessions/:id/stats')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Obter estatísticas detalhadas de uma sessão de revisão',
-  })
-  @ApiParam({ name: 'id', description: 'ID da sessão' })
-  @ApiResponse({
-    status: 200,
-    description: 'Estatísticas retornadas com sucesso',
-    type: ReviewSessionStatsResponseDto,
-  })
-  async getStats(
-    @Param('id') id: string,
-    @Request() req: AuthRequest.AuthenticatedRequest,
-  ): Promise<ReviewSessionStatsResponseDto> {
-    const userId = this.getUserId(req);
-    return this.reviewService.getStats(id, userId);
-  }
-
-  /**
-   * GET /review/sessions/:id — Dados da sessão atual
-   */
   @Get('sessions/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obter estado de uma sessão de revisão específica' })
-  @ApiParam({ name: 'id', description: 'ID da sessão' })
+  @ApiOperation({ summary: 'Obter estado de uma sessão de revisão' })
+  @ApiParam({ name: 'id', type: String, description: 'ID da sessão (cuid)' })
   @ApiResponse({
     status: 200,
-    description: 'Dados da sessão retornados com sucesso',
-    type: ReviewSessionResponseDto,
+    description: 'Sessão retornada com sucesso',
   })
-  async getSession(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  getSession(
     @Param('id') id: string,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewSessionResponseDto> {
-    const userId = this.getUserId(req);
-    return this.reviewService.getSession(id, userId);
+    return this.reviewService.getSession(req.user!.id, id);
   }
 
-  /**
-   * POST /review/sessions/:id/answer — Registrar resposta de um item
-   */
-  @Post('sessions/:id/answer')
+  @Get('sessions/:id/stats')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Registrar resposta SRS de um item na sessão' })
-  @ApiParam({ name: 'id', description: 'ID da sessão' })
+  @ApiOperation({ summary: 'Estatísticas detalhadas de uma sessão' })
+  @ApiParam({ name: 'id', type: String, description: 'ID da sessão (cuid)' })
   @ApiResponse({
     status: 200,
-    description: 'Resposta gravada e próximo estado SRS calculado com sucesso',
-    type: ReviewAnswerResponseDto,
+    description: 'Estatísticas retornadas com sucesso',
   })
-  async submitAnswer(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  getSessionStats(
+    @Param('id') id: string,
+    @Request() req: AuthRequest.AuthenticatedRequest,
+  ): Promise<ReviewSessionStatsResponseDto> {
+    return this.reviewService.getSessionStats(req.user!.id, id);
+  }
+
+  @Post('sessions/:id/answer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Registrar resposta SRS de um item' })
+  @ApiParam({ name: 'id', type: String, description: 'ID da sessão (cuid)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resposta registrada e SRS atualizado',
+  })
+  @ApiResponse({ status: 400, description: 'Payload inválido' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão ou item não encontrado' })
+  @ApiResponse({ status: 409, description: 'Sessão não está em progresso' })
+  submitAnswer(
     @Param('id') id: string,
     @Body() dto: SubmitReviewAnswerDto,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewAnswerResponseDto> {
-    const userId = this.getUserId(req);
-    logStructured('info', 'ReviewController', 'review.answer.request', {
-      sessionId: id,
-      userId,
-      itemId: dto.item_id || dto.itemId,
-    });
-    return this.reviewService.submitAnswer(id, userId, dto);
+    return this.reviewService.submitAnswer(req.user!.id, id, dto);
   }
 
-  /**
-   * POST /review/sessions/:id/end — Encerrar sessão
-   */
   @Post('sessions/:id/end')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Encerrar sessão de revisão e calcular métricas finais',
-  })
-  @ApiParam({ name: 'id', description: 'ID da sessão' })
+  @ApiOperation({ summary: 'Encerrar sessão de revisão' })
+  @ApiParam({ name: 'id', type: String, description: 'ID da sessão (cuid)' })
   @ApiResponse({
     status: 200,
     description: 'Sessão encerrada com sucesso',
-    type: ReviewSessionResponseDto,
   })
-  async endSession(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  @ApiResponse({ status: 409, description: 'Sessão não está em progresso' })
+  endSession(
     @Param('id') id: string,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewSessionResponseDto> {
-    const userId = this.getUserId(req);
-    logStructured('info', 'ReviewController', 'review.end.request', {
-      sessionId: id,
-      userId,
-    });
-    return this.reviewService.endSession(id, userId);
+    return this.reviewService.endSession(req.user!.id, id);
   }
 
-  /**
-   * POST /review/sessions/:id/abandon — Abandonar sessão
-   */
   @Post('sessions/:id/abandon')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Marcar sessão como abandonada mantendo progresso já feito',
-  })
-  @ApiParam({ name: 'id', description: 'ID da sessão' })
+  @ApiOperation({ summary: 'Abandonar sessão preservando progresso' })
+  @ApiParam({ name: 'id', type: String, description: 'ID da sessão (cuid)' })
   @ApiResponse({
     status: 200,
     description: 'Sessão abandonada com sucesso',
-    type: ReviewSessionResponseDto,
   })
-  async abandonSession(
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  @ApiResponse({ status: 409, description: 'Sessão não está em progresso' })
+  abandonSession(
     @Param('id') id: string,
     @Request() req: AuthRequest.AuthenticatedRequest,
   ): Promise<ReviewSessionResponseDto> {
-    const userId = this.getUserId(req);
-    return this.reviewService.abandonSession(id, userId);
+    return this.reviewService.abandonSession(req.user!.id, id);
   }
 }

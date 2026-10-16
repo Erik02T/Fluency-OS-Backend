@@ -1,1 +1,1 @@
-export { ImmersionRepository } from './immersion.repository';
+export * from './immersion.repository';

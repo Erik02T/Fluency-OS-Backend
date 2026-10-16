@@ -1,58 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, ImmersionLog } from '@prisma/client';
+import { ImmersionLog, ImmersionType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
-import { ImmersionLogFiltersDto } from '../dto';
-import { ImmersionLogCreateInput } from '../types/immersion.types';
+import type { ImmersionSortField, ImmersionSortOrder } from '../dto';
 
-type ImmersionSortField = 'loggedAt' | 'durationMinutes' | 'createdAt';
-type SortOrder = 'asc' | 'desc';
+export interface ImmersionLogFilters {
+  type?: ImmersionType;
+  startDate?: Date;
+  endDate?: Date;
+  sort: ImmersionSortField;
+  order: ImmersionSortOrder;
+  skip: number;
+  take: number;
+}
 
 @Injectable()
 export class ImmersionRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(data: ImmersionLogCreateInput): Promise<ImmersionLog> {
-    const createData: Prisma.ImmersionLogCreateInput = {
-      user: { connect: { id: data.userId } },
-      type: data.type,
-      title: data.title,
-      durationMinutes: data.durationMinutes,
-      episode: data.episode ?? undefined,
-      comprehension: data.comprehension ?? undefined,
-      notes: data.notes ?? undefined,
-      isActive: data.isActive ?? true,
-      loggedAt: data.loggedAt ?? new Date(),
-    };
-
-    return this.prisma.immersionLog.create({ data: createData });
-  }
-
-  findAllByUser(
-    userId: string,
-    filters: ImmersionLogFiltersDto,
-  ): Promise<ImmersionLog[]> {
-    const skip = (filters.page - 1) * filters.perPage;
-
-    return this.prisma.immersionLog.findMany({
-      where: this.buildWhere(userId, filters),
-      orderBy: this.buildOrderBy(filters.sort, filters.order),
-      skip,
-      take: filters.perPage,
-    });
-  }
-
-  countByUser(
-    userId: string,
-    filters: ImmersionLogFiltersDto,
-  ): Promise<number> {
-    return this.prisma.immersionLog.count({
-      where: this.buildWhere(userId, filters),
-    });
-  }
-
   private buildWhere(
     userId: string,
-    filters: ImmersionLogFiltersDto,
+    filters: Pick<ImmersionLogFilters, 'type' | 'startDate' | 'endDate'>,
   ): Prisma.ImmersionLogWhereInput {
     const where: Prisma.ImmersionLogWhereInput = { userId };
 
@@ -61,33 +28,78 @@ export class ImmersionRepository {
     }
 
     if (filters.startDate || filters.endDate) {
-      where.loggedAt = {};
-      if (filters.startDate) {
-        where.loggedAt.gte = filters.startDate;
-      }
-      if (filters.endDate) {
-        where.loggedAt.lte = filters.endDate;
-      }
+      where.loggedAt = {
+        ...(filters.startDate ? { gte: filters.startDate } : {}),
+        ...(filters.endDate ? { lte: filters.endDate } : {}),
+      };
     }
 
     return where;
   }
 
-  private buildOrderBy(
-    sort: ImmersionSortField | undefined,
-    order: SortOrder | undefined,
-  ): Prisma.ImmersionLogOrderByWithRelationInput[] {
-    const sortField = sort || 'loggedAt';
-    const sortOrder = order || 'desc';
+  findLogs(
+    userId: string,
+    filters: ImmersionLogFilters,
+  ): Promise<ImmersionLog[]> {
+    return this.prisma.immersionLog.findMany({
+      where: this.buildWhere(userId, filters),
+      orderBy: { [filters.sort]: filters.order },
+      skip: filters.skip,
+      take: filters.take,
+    });
+  }
 
-    if (sortField === 'durationMinutes') {
-      return [{ durationMinutes: sortOrder }];
-    }
+  countLogs(
+    userId: string,
+    filters: Pick<ImmersionLogFilters, 'type' | 'startDate' | 'endDate'>,
+  ): Promise<number> {
+    return this.prisma.immersionLog.count({
+      where: this.buildWhere(userId, filters),
+    });
+  }
 
-    if (sortField === 'createdAt') {
-      return [{ createdAt: sortOrder }];
-    }
+  findById(userId: string, id: string): Promise<ImmersionLog | null> {
+    return this.prisma.immersionLog.findFirst({ where: { id, userId } });
+  }
 
-    return [{ loggedAt: sortOrder }];
+  createLog(
+    userId: string,
+    data: {
+      type: ImmersionType;
+      title: string;
+      durationMinutes: number;
+      episode?: string | null;
+      comprehension?: number | null;
+      notes?: string | null;
+      isActive: boolean;
+      loggedAt: Date;
+    },
+  ): Promise<ImmersionLog> {
+    return this.prisma.immersionLog.create({
+      data: { userId, ...data },
+    });
+  }
+
+  updateLog(
+    userId: string,
+    id: string,
+    data: Prisma.ImmersionLogUpdateInput,
+  ): Promise<ImmersionLog | null> {
+    return this.prisma.immersionLog
+      .updateMany({ where: { id, userId }, data })
+      .then((result) => {
+        if (result.count === 0) {
+          return null;
+        }
+        return this.prisma.immersionLog.findFirst({
+          where: { id, userId },
+        });
+      });
+  }
+
+  deleteLog(userId: string, id: string): Promise<boolean> {
+    return this.prisma.immersionLog
+      .deleteMany({ where: { id, userId } })
+      .then((result) => result.count > 0);
   }
 }

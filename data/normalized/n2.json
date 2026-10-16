@@ -1,0 +1,443 @@
+[
+  {
+    "id": "N2-001",
+    "pattern": "〜ことにする",
+    "jlpt": "N2",
+    "position": 1,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-002",
+    "pattern": "〜ばいいのに",
+    "jlpt": "N2",
+    "position": 2,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-003",
+    "pattern": "〜なかなか〜ない",
+    "jlpt": "N2",
+    "position": 3,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-004",
+    "pattern": "〜しか〜ない",
+    "jlpt": "N2",
+    "position": 4,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-005",
+    "pattern": "〜わけです",
+    "jlpt": "N2",
+    "position": 5,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-006",
+    "pattern": "〜にあたる",
+    "jlpt": "N2",
+    "position": 6,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-007",
+    "pattern": "以外の",
+    "jlpt": "N2",
+    "position": 7,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-008",
+    "pattern": "〜というわけではない",
+    "jlpt": "N2",
+    "position": 8,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-009",
+    "pattern": "なるべく",
+    "jlpt": "N2",
+    "position": 9,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-010",
+    "pattern": "別に〜ない",
+    "jlpt": "N2",
+    "position": 10,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-011",
+    "pattern": "たしか",
+    "jlpt": "N2",
+    "position": 11,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-012",
+    "pattern": "何といっても",
+    "jlpt": "N2",
+    "position": 12,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-013",
+    "pattern": "やっぱり",
+    "jlpt": "N2",
+    "position": 13,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-014",
+    "pattern": "〜と言っても〜",
+    "jlpt": "N2",
+    "position": 14,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-015",
+    "pattern": "〜は〜に限る",
+    "jlpt": "N2",
+    "position": 15,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-016",
+    "pattern": "〜に気をつける",
+    "jlpt": "N2",
+    "position": 16,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-017",
+    "pattern": "ろくに〜ない",
+    "jlpt": "N2",
+    "position": 17,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-018",
+    "pattern": "せいか",
+    "jlpt": "N2",
+    "position": 18,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-019",
+    "pattern": "〜に越したことはない",
+    "jlpt": "N2",
+    "position": 19,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-020",
+    "pattern": "くせに",
+    "jlpt": "N2",
+    "position": 20,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-021",
+    "pattern": "ゆえに",
+    "jlpt": "N2",
+    "position": 21,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-022",
+    "pattern": "および",
+    "jlpt": "N2",
+    "position": 22,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-023",
+    "pattern": "まんいち（万一）",
+    "jlpt": "N2",
+    "position": 23,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-024",
+    "pattern": "あえて",
+    "jlpt": "N2",
+    "position": 24,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-025",
+    "pattern": "がてら",
+    "jlpt": "N2",
+    "position": 25,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-026",
+    "pattern": "かけては",
+    "jlpt": "N2",
+    "position": 26,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-027",
+    "pattern": "かねない",
+    "jlpt": "N2",
+    "position": 27,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-028",
+    "pattern": "いよいよ",
+    "jlpt": "N2",
+    "position": 28,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-029",
+    "pattern": "〜からなる(成る)",
+    "jlpt": "N2",
+    "position": 29,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-030",
+    "pattern": "いつのまにか",
+    "jlpt": "N2",
+    "position": 30,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-031",
+    "pattern": "〜ないで済む",
+    "jlpt": "N2",
+    "position": 31,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-032",
+    "pattern": "せっかく",
+    "jlpt": "N2",
+    "position": 32,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-033",
+    "pattern": "〜わけにはいかない",
+    "jlpt": "N2",
+    "position": 33,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-034",
+    "pattern": "〜ないわけにはいかない",
+    "jlpt": "N2",
+    "position": 34,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-035",
+    "pattern": "〜た上で",
+    "jlpt": "N2",
+    "position": 35,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-036",
+    "pattern": "〜ような気がする",
+    "jlpt": "N2",
+    "position": 36,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-037",
+    "pattern": "いったんーば",
+    "jlpt": "N2",
+    "position": 37,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-038",
+    "pattern": "〜でいいです",
+    "jlpt": "N2",
+    "position": 38,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-039",
+    "pattern": "やむをえず",
+    "jlpt": "N2",
+    "position": 39,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-040",
+    "pattern": "〜ではないだろうか",
+    "jlpt": "N2",
+    "position": 40,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-041",
+    "pattern": "ろくに",
+    "jlpt": "N2",
+    "position": 41,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-042",
+    "pattern": "〜より仕方がない",
+    "jlpt": "N2",
+    "position": 42,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-043",
+    "pattern": "せめて",
+    "jlpt": "N2",
+    "position": 43,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-044",
+    "pattern": "〜ものですから",
+    "jlpt": "N2",
+    "position": 44,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-045",
+    "pattern": "〜が気になる",
+    "jlpt": "N2",
+    "position": 45,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-046",
+    "pattern": "思うように",
+    "jlpt": "N2",
+    "position": 46,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-047",
+    "pattern": "よっぽど",
+    "jlpt": "N2",
+    "position": 47,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-048",
+    "pattern": "さすがに",
+    "jlpt": "N2",
+    "position": 48,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-049",
+    "pattern": "ものの",
+    "jlpt": "N2",
+    "position": 49,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-050",
+    "pattern": "一方では",
+    "jlpt": "N2",
+    "position": 50,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-051",
+    "pattern": "それにしても",
+    "jlpt": "N2",
+    "position": 51,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-052",
+    "pattern": "〜を〜にまかせる",
+    "jlpt": "N2",
+    "position": 52,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-053",
+    "pattern": "いたるまで（至るまで）",
+    "jlpt": "N2",
+    "position": 53,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-054",
+    "pattern": "かねる",
+    "jlpt": "N2",
+    "position": 54,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-055",
+    "pattern": "さしつかえない",
+    "jlpt": "N2",
+    "position": 55,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-056",
+    "pattern": "たちまち",
+    "jlpt": "N2",
+    "position": 56,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-057",
+    "pattern": "つうじて（通じて）",
+    "jlpt": "N2",
+    "position": 57,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-058",
+    "pattern": "なにしろ（何しろ）",
+    "jlpt": "N2",
+    "position": 58,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-059",
+    "pattern": "かたわら（傍ら）",
+    "jlpt": "N2",
+    "position": 59,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-060",
+    "pattern": "ごとし（如し）",
+    "jlpt": "N2",
+    "position": 60,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-061",
+    "pattern": "たまらない",
+    "jlpt": "N2",
+    "position": 61,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-062",
+    "pattern": "とうてい",
+    "jlpt": "N2",
+    "position": 62,
+    "source": "tanos"
+  },
+  {
+    "id": "N2-063",
+    "pattern": "のぼる",
+    "jlpt": "N2",
+    "position": 63,
+    "source": "tanos"
+  }
+]

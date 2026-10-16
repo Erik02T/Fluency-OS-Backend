@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import {
+  VocabularyFiltersDto,
   CreateVocabularyDto,
   UpdateVocabularyDto,
-  VocabularyFiltersDto,
 } from '../dto';
 import {
   vocabularyDetailInclude,
@@ -43,7 +43,7 @@ export class VocabularyRepository {
     });
   }
 
-  async findByWordAndReading(
+  findByWordAndReading(
     word: string,
     reading: string,
   ): Promise<VocabularyDetailEntity | null> {
@@ -58,12 +58,30 @@ export class VocabularyRepository {
   ): Promise<VocabularyDetailEntity> {
     return this.prisma.$transaction(async (tx) => {
       const vocabulary = await tx.vocabulary.create({
-        data: this.buildVocabularyCreateData(dto),
+        data: {
+          word: dto.word,
+          reading: dto.reading,
+          jlptLevel: dto.jlptLevel,
+          frequency: dto.frequency,
+          partOfSpeech: dto.partOfSpeech,
+          tags: dto.tags ?? [],
+          notes: dto.notes,
+          audioUrl: dto.audioUrl,
+        },
       });
 
       await this.syncVocabularyRelations(tx, vocabulary.id, dto);
 
-      return this.findByIdFullWithClient(tx, vocabulary.id);
+      const full = await tx.vocabulary.findUnique({
+        where: { id: vocabulary.id },
+        include: vocabularyDetailInclude,
+      });
+
+      if (!full) {
+        throw new Error('Vocabulary not found after create');
+      }
+
+      return full;
     });
   }
 
@@ -81,14 +99,24 @@ export class VocabularyRepository {
         return null;
       }
 
-      await tx.vocabulary.update({
-        where: { id },
-        data: this.buildVocabularyUpdateData(dto),
-      });
+      const data: Prisma.VocabularyUpdateInput = {};
+      if (dto.word !== undefined) data.word = dto.word;
+      if (dto.reading !== undefined) data.reading = dto.reading;
+      if (dto.jlptLevel !== undefined) data.jlptLevel = dto.jlptLevel;
+      if (dto.frequency !== undefined) data.frequency = dto.frequency;
+      if (dto.partOfSpeech !== undefined) data.partOfSpeech = dto.partOfSpeech;
+      if (dto.tags !== undefined) data.tags = dto.tags;
+      if (dto.notes !== undefined) data.notes = dto.notes;
+      if (dto.audioUrl !== undefined) data.audioUrl = dto.audioUrl;
+
+      await tx.vocabulary.update({ where: { id }, data });
 
       await this.syncVocabularyRelations(tx, id, dto);
 
-      return this.findByIdFullWithClient(tx, id);
+      return tx.vocabulary.findUnique({
+        where: { id },
+        include: vocabularyDetailInclude,
+      });
     });
   }
 
@@ -107,64 +135,6 @@ export class VocabularyRepository {
 
       return true;
     });
-  }
-
-  private async findByIdFullWithClient(
-    client: Prisma.TransactionClient,
-    id: string,
-  ): Promise<VocabularyDetailEntity> {
-    const vocabulary = await client.vocabulary.findUnique({
-      where: { id },
-      include: vocabularyDetailInclude,
-    });
-
-    if (!vocabulary) {
-      throw new Error(
-        `Vocabulary with id ${id} not found after write operation`,
-      );
-    }
-
-    return vocabulary;
-  }
-
-  private buildVocabularyCreateData(
-    dto: CreateVocabularyDto,
-  ): Prisma.VocabularyCreateInput {
-    return {
-      word: dto.word,
-      reading: dto.reading,
-      jlptLevel: dto.jlptLevel,
-      frequency: dto.frequency ?? null,
-      partOfSpeech: dto.partOfSpeech ?? null,
-      tags: dto.tags ?? [],
-      notes: dto.notes ?? null,
-      audioUrl: dto.audioUrl ?? null,
-    };
-  }
-
-  private buildVocabularyUpdateData(
-    dto: UpdateVocabularyDto,
-  ): Prisma.VocabularyUpdateInput {
-    const data: Prisma.VocabularyUpdateInput = {};
-
-    if (dto.word !== undefined) data.word = dto.word;
-    if (dto.reading !== undefined) data.reading = dto.reading;
-    if (dto.jlptLevel !== undefined) data.jlptLevel = dto.jlptLevel;
-    if (dto.frequency !== undefined) {
-      data.frequency = dto.frequency === null ? null : dto.frequency;
-    }
-    if (dto.partOfSpeech !== undefined) {
-      data.partOfSpeech = dto.partOfSpeech === null ? null : dto.partOfSpeech;
-    }
-    if (dto.tags !== undefined) data.tags = dto.tags;
-    if (dto.notes !== undefined) {
-      data.notes = dto.notes === null ? null : dto.notes;
-    }
-    if (dto.audioUrl !== undefined) {
-      data.audioUrl = dto.audioUrl === null ? null : dto.audioUrl;
-    }
-
-    return data;
   }
 
   private async syncVocabularyRelations(

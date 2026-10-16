@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ReadingType } from '@prisma/client';
+import { Prisma, ReadingType } from '@prisma/client';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
 import {
   CreateKanjiDto,
@@ -21,12 +21,14 @@ import {
   UserKanjiProgressEntity,
 } from './types/kanji.types';
 import { logStructured } from '../../common/logging/structured-log';
+import { SrsService } from '../review/srs.service';
 
 @Injectable()
 export class KanjiService {
   constructor(
     private kanjiRepository: KanjiRepository,
     private userProgressRepository: UserKanjiProgressRepository,
+    private readonly srsService: SrsService,
   ) {}
 
   /**
@@ -238,13 +240,6 @@ export class KanjiService {
     return Promise.resolve({});
   }
 
-  /**
-   * Atualizar progresso de kanji (estudar ou enviar para review)
-   * @param userId ID do usuário
-   * @param kanjiId ID do kanji
-   * @param dto DTO com action
-   * @returns KanjiProgressResponseDto
-   */
   async updateProgress(
     userId: string,
     kanjiId: string,
@@ -262,23 +257,80 @@ export class KanjiService {
     );
 
     if (dto.action === 'study') {
-      progress = await this.userProgressRepository.upsert(userId, kanjiId);
+      if (!progress) {
+        progress = await this.userProgressRepository.create(userId, kanjiId);
+      }
+
       return this.toProgressDto(kanjiId, progress);
     }
 
-    // action === 'review'
-    // O item entra na fila IMEDIATAMENTE (nextReviewAt = now) para que
-    // apareça na fila de revisão sem esperar o próximo agendamento.
     if (!progress) {
-      progress = await this.userProgressRepository.upsert(userId, kanjiId);
+      progress = await this.userProgressRepository.create(userId, kanjiId);
     }
 
-    // Força a próxima revisão para agora para que o item apareça na fila.
-    progress = await this.userProgressRepository.update(userId, kanjiId, {
-      nextReviewAt: new Date(),
-    });
+    const updateData = this.buildReviewUpdate(progress, dto.correct === true);
+    const updated = await this.userProgressRepository.update(
+      userId,
+      kanjiId,
+      updateData,
+    );
 
-    return this.toProgressDto(kanjiId, progress);
+    return this.toProgressDto(kanjiId, updated);
+  }
+
+  /**
+   * Regra de revisao do progresso - SM-2 adaptado (fonte autoritativa:
+   * docs/architecture.md + fluency-os-backend-spec.md RN-SRS001..008),
+   * delegada ao SrsService para garantir UMA unica implementacao do
+   * algoritmo em todo o backend (review sessions e progress endpoints).
+   *
+   * Mapeamento do contrato booleano legado para as qualidades SM-2:
+   *   correct: true  -> quality 2 (acertou com dificuldade)
+   *   correct: false -> quality 0 (falhou / reset do ciclo)
+   */
+  private buildReviewUpdate(
+    progress: UserKanjiProgressEntity,
+    correct: boolean,
+  ): Prisma.UserKanjiProgressUpdateInput {
+    const now = new Date();
+    const srs = this.srsService.calculateNextReview(
+      progress,
+      correct ? 2 : 0,
+      now,
+    );
+
+    return {
+      srsLevel: srs.newSrsLevel,
+      easeFactor: srs.newEaseFactor,
+      intervalDays: srs.newIntervalDays,
+      nextReviewAt: srs.nextReviewAt,
+      lastReviewAt: now,
+      totalReviews: progress.totalReviews + 1,
+      correctReviews: progress.correctReviews + (correct ? 1 : 0),
+      isMastered: srs.isMastered,
+      masteredAt: srs.isMastered ? (progress.masteredAt ?? now) : null,
+    };
+  }
+
+  private toProgressDto(
+    kanjiId: string,
+    progress: UserKanjiProgressEntity,
+  ): KanjiProgressResponseDto {
+    return {
+      kanjiId,
+      srsLevel: progress.srsLevel,
+      isMastered: progress.isMastered,
+      isFavorited: progress.isFavorite,
+      isSuspended: progress.isSuspended,
+      easeFactor: progress.easeFactor,
+      intervalDays: progress.intervalDays,
+      nextReviewAt: progress.nextReviewAt,
+      lastReviewedAt: progress.lastReviewAt ?? undefined,
+      totalReviews: progress.totalReviews,
+      correctReviews: progress.correctReviews,
+      addedAt: progress.addedAt,
+      masteredAt: progress.masteredAt ?? undefined,
+    };
   }
 
   private toListDto(
@@ -390,27 +442,6 @@ export class KanjiService {
             streak: 0,
           }
         : undefined,
-    };
-  }
-
-  private toProgressDto(
-    kanjiId: string,
-    progress: UserKanjiProgressEntity,
-  ): KanjiProgressResponseDto {
-    return {
-      kanjiId,
-      srsLevel: progress.srsLevel,
-      isMastered: progress.isMastered,
-      isFavorited: progress.isFavorite,
-      isSuspended: progress.isSuspended,
-      easeFactor: progress.easeFactor,
-      intervalDays: progress.intervalDays,
-      nextReviewAt: progress.nextReviewAt,
-      lastReviewedAt: progress.lastReviewAt ?? undefined,
-      totalReviews: progress.totalReviews,
-      correctReviews: progress.correctReviews,
-      addedAt: progress.addedAt,
-      masteredAt: progress.masteredAt ?? undefined,
     };
   }
 }
