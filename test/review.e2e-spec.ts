@@ -454,9 +454,17 @@ describe('Review E2E', () => {
       intervalAfter: 10,
       responseTimeMs: 3200,
     });
+
+    const retry = await request(app.getHttpServer())
+      .post(`/review/sessions/${sessionId}/answer`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ item_id: kanjiId, item_type: 'kanji', answer_quality: 2 })
+      .expect(200);
+    expect(retry.body).toEqual(answered.body);
+    expect(await prisma.reviewAnswer.count({ where: { sessionId } })).toBe(1);
   });
 
-  it('encerra sessão, retorna stats e rejeita end duplicado', async () => {
+  it('persiste uma resposta concorrente e repete o encerramento com as mesmas métricas', async () => {
     const created = await request(app.getHttpServer())
       .post('/review/sessions')
       .set('Authorization', `Bearer ${accessToken}`)
@@ -466,17 +474,20 @@ describe('Review E2E', () => {
     assertSessionBody(created.body);
     const sessionId: string = created.body.id;
 
-    // quality 1 (difícil) no vocabulário
-    await request(app.getHttpServer())
-      .post(`/review/sessions/${sessionId}/answer`)
-      .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        item_id: vocabId,
-        item_type: 'vocabulary',
-        answer_quality: 1,
-        response_time_ms: 5000,
-      })
-      .expect(200);
+    const review = () =>
+      request(app.getHttpServer())
+        .post(`/review/sessions/${sessionId}/answer`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          item_id: vocabId,
+          item_type: 'vocabulary',
+          answer_quality: 1,
+          response_time_ms: 5000,
+        })
+        .expect(200);
+    const [first, second] = await Promise.all([review(), review()]);
+    expect(second.body).toEqual(first.body);
+    expect(await prisma.reviewAnswer.count({ where: { sessionId } })).toBe(1);
 
     const ended = await request(app.getHttpServer())
       .post(`/review/sessions/${sessionId}/end`)
@@ -504,11 +515,13 @@ describe('Review E2E', () => {
       correct_easy: 0,
     });
 
-    // end duplicado → 409
-    await request(app.getHttpServer())
+    const endedAgain = await request(app.getHttpServer())
       .post(`/review/sessions/${sessionId}/end`)
       .set('Authorization', `Bearer ${accessToken}`)
-      .expect(409);
+      .expect(200);
+    expect(endedAgain.body).toEqual(ended.body);
+    const retried = await review();
+    expect(retried.body).toEqual(first.body);
 
     // answer após end → 409
     await request(app.getHttpServer())
@@ -624,5 +637,105 @@ describe('Review E2E', () => {
       .get('/review/sessions/session-inexistente')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(404);
+  });
+
+  it('mantém resposta, encerramento e histórico consistentes sob disputa', async () => {
+    await prisma.userVocabularyProgress.update({
+      where: { userId_vocabularyId: { userId, vocabularyId: futureVocabId } },
+      data: { nextReviewAt: dueDate },
+    });
+    const created = await request(app.getHttpServer())
+      .post('/review/sessions')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ session_type: 'vocabulary', limit: 1 })
+      .expect(201);
+    assertSessionBody(created.body);
+    const { id: sessionId } = created.body;
+    const review = () =>
+      request(app.getHttpServer())
+        .post(`/review/sessions/${sessionId}/answer`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          item_id: futureVocabId,
+          item_type: 'vocabulary',
+          answer_quality: 2,
+        });
+    const close = () =>
+      request(app.getHttpServer())
+        .post(`/review/sessions/${sessionId}/end`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+    const [answer, closed] = await Promise.all([review(), close()]);
+    expect([200, 409]).toContain(answer.status);
+    const reviewed = answer.status === 200 ? 1 : 0;
+    expect(closed.body).toMatchObject({
+      reviewed_items: reviewed,
+      status: 'completed',
+    });
+    expect(await prisma.reviewAnswer.count({ where: { sessionId } })).toBe(
+      reviewed,
+    );
+    const retry = await review().expect(answer.status);
+    if (reviewed) expect(retry.body).toEqual(answer.body);
+    expect((await close()).body).toEqual(closed.body);
+  });
+
+  it('inclui itens na fila sem registrar uma avaliação ou duplicar progresso', async () => {
+    const where = {
+      userId_vocabularyId: { userId, vocabularyId: futureVocabId },
+    };
+    const future = await prisma.userVocabularyProgress.update({
+      where,
+      data: { nextReviewAt: futureDate },
+    });
+    const enqueue = (token: string, itemType: string, itemId: string) =>
+      request(app.getHttpServer())
+        .post('/review/queue')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ item_type: itemType, item_id: itemId });
+
+    await Promise.all([
+      enqueue(accessToken, 'vocabulary', futureVocabId).expect(204),
+      enqueue(accessToken, 'vocabulary', futureVocabId).expect(204),
+    ]);
+
+    const scheduled = await prisma.userVocabularyProgress.findUniqueOrThrow({
+      where,
+    });
+    expect(scheduled.nextReviewAt.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(scheduled).toEqual({
+      ...future,
+      nextReviewAt: scheduled.nextReviewAt,
+    });
+    await enqueue(accessToken, 'vocabulary', futureVocabId).expect(204);
+    expect(
+      await prisma.userVocabularyProgress.findUniqueOrThrow({ where }),
+    ).toEqual(scheduled);
+
+    const queue = await request(app.getHttpServer())
+      .get('/review/queue')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    assertQueueBody(queue.body);
+    expect(
+      queue.body.items.filter(({ item }) => item.id === futureVocabId),
+    ).toHaveLength(1);
+
+    await request(app.getHttpServer())
+      .get('/review/queue/count')
+      .set('Authorization', `Bearer ${otherAccessToken}`)
+      .expect(200, { kanji: 0, vocabulary: 0, total: 0 });
+    await enqueue(otherAccessToken, 'kanji', kanjiId).expect(204);
+    await request(app.getHttpServer())
+      .get('/review/queue/count')
+      .set('Authorization', `Bearer ${otherAccessToken}`)
+      .expect(200, { kanji: 1, vocabulary: 0, total: 1 });
+    await enqueue(accessToken, 'kanji', suspendedKanjiId).expect(409);
+    await enqueue(accessToken, 'kanji', 'nao-existe').expect(404);
+    await enqueue(accessToken, 'sentence', kanjiId).expect(400);
+    await request(app.getHttpServer())
+      .post('/review/queue')
+      .send({ item_type: 'kanji', item_id: kanjiId })
+      .expect(401);
   });
 });

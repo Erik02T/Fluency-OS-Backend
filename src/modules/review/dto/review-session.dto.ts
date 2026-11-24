@@ -1,24 +1,47 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
-export const REVIEW_SESSION_TYPES = [
-  'kanji',
-  'vocabulary',
-  'sentence',
-] as const;
+export const REVIEW_SESSION_TYPES = ['kanji', 'vocabulary'] as const;
 export type ReviewSessionTypeValue = (typeof REVIEW_SESSION_TYPES)[number];
 
 export const REVIEW_QUALITY_VALUES = [0, 1, 2, 3] as const;
 
+export class EnqueueReviewItemDto {
+  @ApiProperty({ enum: REVIEW_SESSION_TYPES, example: 'kanji' })
+  @IsIn(REVIEW_SESSION_TYPES)
+  item_type!: ReviewSessionTypeValue;
+
+  @ApiProperty({ example: 'clxyz1234567890' })
+  @IsString()
+  @IsNotEmpty()
+  item_id!: string;
+}
+
 export class CreateReviewSessionDto {
-  @ApiPropertyOptional({ enum: REVIEW_SESSION_TYPES, example: 'kanji' })
+  @ApiPropertyOptional({
+    enum: REVIEW_SESSION_TYPES,
+    default: 'kanji',
+    description: 'Tipo da sessão. Tem precedência sobre sessionType.',
+  })
   @IsOptional()
   @IsIn(REVIEW_SESSION_TYPES)
   session_type?: ReviewSessionTypeValue;
 
   // Alias camelCase aceito pelo contrato do frontend
-  @ApiPropertyOptional({ enum: REVIEW_SESSION_TYPES, example: 'kanji' })
+  @ApiPropertyOptional({
+    enum: REVIEW_SESSION_TYPES,
+    example: 'kanji',
+    description: 'Alias de session_type.',
+  })
   @IsOptional()
   @IsIn(REVIEW_SESSION_TYPES)
   sessionType?: ReviewSessionTypeValue;

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   Prisma,
-  ReviewAnswer,
   ReviewQuality,
   ReviewSession,
   ReviewSessionStatus,
@@ -11,6 +10,11 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import { SrsService, SRSQuality } from '../srs.service';
+import type { ReviewSessionTypeValue } from '../dto/review-session.dto';
+import type {
+  ReviewAnswerResponseDto,
+  ReviewQueueItemDto,
+} from '../dto/review-response.dto';
 
 export type ReviewProgressEntity = UserKanjiProgress | UserVocabularyProgress;
 
@@ -41,29 +45,21 @@ export type DueVocabularyProgressWithRelations = UserVocabularyProgress & {
 export type AnswerTransactionResult =
   | {
       ok: true;
-      progress: ReviewProgressEntity;
-      answer: ReviewAnswer;
-      session: ReviewSession;
+      response: ReviewAnswerResponseDto;
     }
   | {
       ok: false;
-      reason: 'session_not_found' | 'session_not_active' | 'progress_not_found';
+      reason:
+        | 'session_not_found'
+        | 'session_not_active'
+        | 'progress_not_found'
+        | 'card_not_in_session'
+        | 'answer_conflict';
     };
 
 export type SessionStateChangeResult =
   | { ok: true; session: ReviewSession }
   | { ok: false; reason: 'session_not_found' | 'session_not_active' };
-
-class RollbackAnswerError extends Error {
-  constructor(
-    readonly reason:
-      | 'session_not_found'
-      | 'session_not_active'
-      | 'progress_not_found',
-  ) {
-    super(`answer rollback: ${reason}`);
-  }
-}
 
 @Injectable()
 export class ReviewRepository {
@@ -73,6 +69,57 @@ export class ReviewRepository {
   ) {}
 
   // ─── Fila de revisão ────────────────────────────────────────────────────────
+
+  async enqueue(
+    userId: string,
+    itemType: ReviewSessionTypeValue,
+    itemId: string,
+    now: Date,
+  ): Promise<'queued' | 'missing' | 'suspended'> {
+    return this.prisma.$transaction(async (tx) => {
+      const id = { id: itemId };
+      const select = { id: true } as const;
+      const item =
+        itemType === 'kanji'
+          ? await tx.kanji.findUnique({ where: id, select })
+          : await tx.vocabulary.findUnique({ where: id, select });
+      if (!item) return 'missing';
+
+      const due = { nextReviewAt: now };
+      const eligible = { userId, isSuspended: false };
+      const future = { nextReviewAt: { gt: now } };
+
+      if (itemType === 'kanji') {
+        const kanjiId = item.id;
+        await tx.userKanjiProgress.createMany({
+          data: { userId, kanjiId, srsLevel: 0, ...due },
+          skipDuplicates: true,
+        });
+        const where = { ...eligible, kanjiId };
+        await tx.userKanjiProgress.updateMany({
+          where: { ...where, ...future },
+          data: due,
+        });
+        return (await tx.userKanjiProgress.count({ where })) > 0
+          ? 'queued'
+          : 'suspended';
+      }
+
+      const vocabularyId = item.id;
+      await tx.userVocabularyProgress.createMany({
+        data: { userId, vocabularyId, srsLevel: 1, ...due },
+        skipDuplicates: true,
+      });
+      const where = { ...eligible, vocabularyId };
+      await tx.userVocabularyProgress.updateMany({
+        where: { ...where, ...future },
+        data: due,
+      });
+      return (await tx.userVocabularyProgress.count({ where })) > 0
+        ? 'queued'
+        : 'suspended';
+    });
+  }
 
   findDueKanjiProgress(
     userId: string,
@@ -85,7 +132,7 @@ export class ReviewRepository {
         isSuspended: false,
         nextReviewAt: { lte: now },
       },
-      orderBy: [{ nextReviewAt: 'asc' }, { srsLevel: 'asc' }],
+      orderBy: [{ nextReviewAt: 'asc' }, { srsLevel: 'asc' }, { id: 'asc' }],
       take,
       include: {
         kanji: {
@@ -109,7 +156,7 @@ export class ReviewRepository {
         isSuspended: false,
         nextReviewAt: { lte: now },
       },
-      orderBy: [{ nextReviewAt: 'asc' }, { srsLevel: 'asc' }],
+      orderBy: [{ nextReviewAt: 'asc' }, { srsLevel: 'asc' }, { id: 'asc' }],
       take,
       include: {
         vocabulary: {
@@ -142,28 +189,31 @@ export class ReviewRepository {
   createSession(
     userId: string,
     itemType: SRSItemType,
-    totalItems: number,
+    cards: ReviewQueueItemDto[],
   ): Promise<ReviewSession> {
     return this.prisma.reviewSession.create({
       data: {
         userId,
         itemType,
-        totalItems,
+        totalItems: cards.length,
+        cards: cards as unknown as Prisma.InputJsonValue,
       },
     });
   }
 
-  findSessionById(sessionId: string): Promise<ReviewSession | null> {
-    return this.prisma.reviewSession.findUnique({ where: { id: sessionId } });
-  }
-
-  findSessionWithAnswers(sessionId: string) {
-    return this.prisma.reviewSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        answers: { orderBy: { answeredAt: 'asc' } },
+  findSessionWithAnswers(sessionId: string, userId: string) {
+    return this.prisma.$transaction(
+      (tx) =>
+        tx.reviewSession.findUnique({
+          where: { id: sessionId, userId },
+          include: {
+            answers: { orderBy: [{ answeredAt: 'asc' }, { id: 'asc' }] },
+          },
+        }),
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
       },
-    });
+    );
   }
 
   findSessions(
@@ -191,17 +241,6 @@ export class ReviewRepository {
 
   // ─── Resposta (transação atômica) ──────────────────────────────────────────
 
-  /**
-   * Aplica uma resposta de revisão em uma única transação:
-   * 1. valida sessão (propriedade + status IN_PROGRESS)
-   * 2. carrega o progresso do item
-   * 3. calcula o novo SRS (SM-2 adaptado)
-   * 4. UPDATE user_{kanji,vocabulary}_progress
-   * 5. INSERT review_answers
-   * 6. UPDATE review_sessions (contadores atômicos)
-   *
-   * Qualquer violação lança RollbackAnswerError → transação desfaz tudo.
-   */
   async answerTransaction(params: {
     userId: string;
     sessionId: string;
@@ -215,18 +254,44 @@ export class ReviewRepository {
     const { userId, sessionId, itemType, itemId, quality } = params;
     const correct = quality >= 2;
 
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const session = await tx.reviewSession.findUnique({
-          where: { id: sessionId },
-        });
+    return this.prisma.$transaction(
+      async (tx): Promise<AnswerTransactionResult> => {
+        const session = await this.lockSession(tx, userId, sessionId);
 
-        if (!session || session.userId !== userId) {
-          throw new RollbackAnswerError('session_not_found');
+        if (!session) {
+          return { ok: false, reason: 'session_not_found' };
+        }
+
+        const previous = await tx.reviewAnswer.findUnique({
+          where: { sessionId_itemType_itemId: { sessionId, itemType, itemId } },
+        });
+        if (previous) {
+          if (previous.quality !== params.qualityValue || !previous.response) {
+            return { ok: false, reason: 'answer_conflict' };
+          }
+          return {
+            ok: true,
+            response: previous.response as unknown as ReviewAnswerResponseDto,
+          };
         }
 
         if (session.status !== ReviewSessionStatus.IN_PROGRESS) {
-          throw new RollbackAnswerError('session_not_active');
+          return { ok: false, reason: 'session_not_active' };
+        }
+        const cards = session.cards as unknown as ReviewQueueItemDto[];
+        if (
+          session.itemType !== itemType ||
+          !cards.some((card) => card.item.id === itemId)
+        ) {
+          return { ok: false, reason: 'card_not_in_session' };
+        }
+
+        if (itemType === SRSItemType.KANJI) {
+          await tx.$queryRaw`SELECT "id" FROM "user_kanji_progress"
+            WHERE "userId" = ${userId} AND "kanjiId" = ${itemId} FOR UPDATE`;
+        } else {
+          await tx.$queryRaw`SELECT "id" FROM "user_vocabulary_progress"
+            WHERE "userId" = ${userId} AND "vocabularyId" = ${itemId} FOR UPDATE`;
         }
 
         const progress =
@@ -241,13 +306,16 @@ export class ReviewRepository {
               });
 
         if (!progress) {
-          throw new RollbackAnswerError('progress_not_found');
+          return { ok: false, reason: 'progress_not_found' };
         }
 
+        const answeredAt = new Date(
+          Math.max(params.now.getTime(), progress.lastReviewAt?.getTime() ?? 0),
+        );
         const srsResult = this.srs.calculateNextReview(
           progress,
           quality,
-          params.now,
+          answeredAt,
         );
 
         const progressData: Prisma.UserKanjiProgressUpdateInput = {
@@ -255,29 +323,44 @@ export class ReviewRepository {
           easeFactor: srsResult.newEaseFactor,
           intervalDays: srsResult.newIntervalDays,
           nextReviewAt: srsResult.nextReviewAt,
-          lastReviewAt: params.now,
+          lastReviewAt: answeredAt,
           isMastered: srsResult.isMastered,
           masteredAt: srsResult.isMastered
-            ? (progress.masteredAt ?? params.now)
+            ? (progress.masteredAt ?? answeredAt)
             : null,
           totalReviews: { increment: 1 },
           correctReviews: { increment: correct ? 1 : 0 },
         };
 
-        const updatedProgress =
-          itemType === SRSItemType.KANJI
-            ? await tx.userKanjiProgress.update({
-                where: { userId_kanjiId: { userId, kanjiId: itemId } },
-                data: progressData,
-              })
-            : await tx.userVocabularyProgress.update({
-                where: {
-                  userId_vocabularyId: { userId, vocabularyId: itemId },
-                },
-                data: progressData,
-              });
+        if (itemType === SRSItemType.KANJI) {
+          await tx.userKanjiProgress.update({
+            where: { userId_kanjiId: { userId, kanjiId: itemId } },
+            data: progressData,
+          });
+        } else {
+          await tx.userVocabularyProgress.update({
+            where: { userId_vocabularyId: { userId, vocabularyId: itemId } },
+            data: progressData,
+          });
+        }
 
-        const answer = await tx.reviewAnswer.create({
+        const reviewed = session.completedItems + 1;
+        const correctItems = session.correctItems + Number(correct);
+        const response = {
+          previous_srs_level: progress.srsLevel,
+          new_srs_level: srsResult.newSrsLevel,
+          previous_interval: progress.intervalDays,
+          new_interval: srsResult.newIntervalDays,
+          next_review_at: srsResult.nextReviewAt.toISOString(),
+          is_mastered: srsResult.isMastered,
+          session_progress: {
+            reviewed,
+            total: session.totalItems,
+            correct: correctItems,
+            incorrect: reviewed - correctItems,
+          },
+        } satisfies ReviewAnswerResponseDto;
+        await tx.reviewAnswer.create({
           data: {
             sessionId,
             itemType,
@@ -288,31 +371,33 @@ export class ReviewRepository {
             srsLevelAfter: srsResult.newSrsLevel,
             intervalBefore: progress.intervalDays,
             intervalAfter: srsResult.newIntervalDays,
-            answeredAt: params.now,
+            response,
+            answeredAt,
           },
         });
 
-        const updatedSession = await tx.reviewSession.update({
+        await tx.reviewSession.update({
           where: { id: sessionId },
           data: {
-            completedItems: { increment: 1 },
-            correctItems: { increment: correct ? 1 : 0 },
+            completedItems: reviewed,
+            correctItems,
           },
         });
 
-        return {
-          ok: true as const,
-          progress: updatedProgress,
-          answer,
-          session: updatedSession,
-        };
-      });
-    } catch (error) {
-      if (error instanceof RollbackAnswerError) {
-        return { ok: false, reason: error.reason };
-      }
-      throw error;
-    }
+        return { ok: true, response };
+      },
+    );
+  }
+
+  private async lockSession(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    sessionId: string,
+  ): Promise<ReviewSession | null> {
+    const [session] = await tx.$queryRaw<ReviewSession[]>`SELECT *
+      FROM "review_sessions"
+      WHERE "id" = ${sessionId} AND "userId" = ${userId} FOR UPDATE`;
+    return session ?? null;
   }
 
   async completeSession(
@@ -320,53 +405,7 @@ export class ReviewRepository {
     sessionId: string,
     now: Date,
   ): Promise<SessionStateChangeResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const session = await tx.reviewSession.findUnique({
-        where: { id: sessionId },
-      });
-
-      if (!session || session.userId !== userId) {
-        return { ok: false as const, reason: 'session_not_found' as const };
-      }
-
-      if (session.status !== ReviewSessionStatus.IN_PROGRESS) {
-        return { ok: false as const, reason: 'session_not_active' as const };
-      }
-
-      const accuracyRate =
-        session.completedItems > 0
-          ? session.correctItems / session.completedItems
-          : null;
-      const durationSeconds = Math.max(
-        0,
-        Math.floor((now.getTime() - session.startedAt.getTime()) / 1000),
-      );
-
-      // Guard atômico: só completa se ainda estiver IN_PROGRESS
-      const guarded = await tx.reviewSession.updateMany({
-        where: {
-          id: sessionId,
-          userId,
-          status: ReviewSessionStatus.IN_PROGRESS,
-        },
-        data: {
-          status: ReviewSessionStatus.COMPLETED,
-          completedAt: now,
-          accuracyRate,
-          durationSeconds,
-        },
-      });
-
-      if (guarded.count === 0) {
-        return { ok: false as const, reason: 'session_not_active' as const };
-      }
-
-      const updated = await tx.reviewSession.findUniqueOrThrow({
-        where: { id: sessionId },
-      });
-
-      return { ok: true as const, session: updated };
-    });
+    return this.closeSession(userId, sessionId, now, 'COMPLETED');
   }
 
   async abandonSession(
@@ -374,78 +413,74 @@ export class ReviewRepository {
     sessionId: string,
     now: Date,
   ): Promise<SessionStateChangeResult> {
-    return this.prisma.$transaction(async (tx) => {
-      const session = await tx.reviewSession.findUnique({
-        where: { id: sessionId },
-      });
+    return this.closeSession(userId, sessionId, now, 'ABANDONED');
+  }
 
-      if (!session || session.userId !== userId) {
+  private async closeSession(
+    userId: string,
+    sessionId: string,
+    now: Date,
+    status: 'COMPLETED' | 'ABANDONED',
+  ): Promise<SessionStateChangeResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const session = await this.lockSession(tx, userId, sessionId);
+      if (!session) {
         return { ok: false as const, reason: 'session_not_found' as const };
       }
-
+      if (session.status === 'COMPLETED' && status === 'COMPLETED') {
+        return { ok: true as const, session };
+      }
       if (session.status !== ReviewSessionStatus.IN_PROGRESS) {
         return { ok: false as const, reason: 'session_not_active' as const };
       }
 
-      const guarded = await tx.reviewSession.updateMany({
-        where: {
-          id: sessionId,
-          userId,
-          status: ReviewSessionStatus.IN_PROGRESS,
-        },
-        data: {
-          status: ReviewSessionStatus.ABANDONED,
-          abandonedAt: now,
-        },
+      const groups = await tx.reviewAnswer.groupBy({
+        by: ['quality'],
+        where: { sessionId, itemType: session.itemType },
+        _count: { _all: true },
       });
-
-      if (guarded.count === 0) {
-        return { ok: false as const, reason: 'session_not_active' as const };
-      }
-
-      const updated = await tx.reviewSession.findUniqueOrThrow({
+      const completedItems = groups.reduce(
+        (sum, group) => sum + group._count._all,
+        0,
+      );
+      const correctItems = groups
+        .filter(
+          ({ quality }) =>
+            quality === 'CORRECT_HARD' || quality === 'CORRECT_EASY',
+        )
+        .reduce((sum, group) => sum + group._count._all, 0);
+      const latestAnswer = await tx.reviewAnswer.findFirst({
+        where: { sessionId },
+        orderBy: { answeredAt: 'desc' },
+        select: { answeredAt: true },
+      });
+      const closedAt = new Date(
+        Math.max(now.getTime(), latestAnswer?.answeredAt.getTime() ?? 0),
+      );
+      const updated = await tx.reviewSession.update({
         where: { id: sessionId },
+        data: {
+          status,
+          completedItems,
+          correctItems,
+          ...(status === 'COMPLETED'
+            ? {
+                completedAt: closedAt,
+                accuracyRate: completedItems
+                  ? correctItems / completedItems
+                  : null,
+                durationSeconds: Math.max(
+                  0,
+                  Math.floor(
+                    (closedAt.getTime() - session.startedAt.getTime()) / 1000,
+                  ),
+                ),
+              }
+            : { abandonedAt: closedAt }),
+        },
       });
 
       return { ok: true as const, session: updated };
     });
-  }
-
-  // ─── Estatísticas ───────────────────────────────────────────────────────────
-
-  async getSessionAnswerStats(sessionId: string): Promise<{
-    counts: Partial<Record<ReviewQuality, number>>;
-    averageResponseTimeMs: number | null;
-    masteredCount: number;
-  }> {
-    const [groups, aggregate, masteredCount] = await Promise.all([
-      this.prisma.reviewAnswer.groupBy({
-        by: ['quality'],
-        where: { sessionId },
-        _count: { _all: true },
-      }),
-      this.prisma.reviewAnswer.aggregate({
-        where: { sessionId, responseTimeMs: { not: null } },
-        _avg: { responseTimeMs: true },
-      }),
-      this.prisma.reviewAnswer.count({
-        where: {
-          sessionId,
-          srsLevelBefore: { lt: 5 },
-          srsLevelAfter: { gte: 5 },
-        },
-      }),
-    ]);
-
-    const counts: Partial<Record<ReviewQuality, number>> = {};
-    for (const group of groups) {
-      counts[group.quality] = group._count._all;
-    }
-
-    return {
-      counts,
-      averageResponseTimeMs: aggregate._avg.responseTimeMs ?? null,
-      masteredCount,
-    };
   }
 }

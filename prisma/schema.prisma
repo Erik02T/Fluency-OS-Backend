@@ -563,6 +563,7 @@ model ReviewSession {
   userId          String
   status          ReviewSessionStatus @default(IN_PROGRESS)
   itemType        SRSItemType         @default(KANJI)
+  cards          Json                @default("[]")
   totalItems      Int                 @default(0)
   completedItems  Int                 @default(0)
   correctItems    Int                 @default(0)
@@ -594,11 +595,12 @@ model ReviewAnswer {
   srsLevelAfter  Int
   intervalBefore Int           // dias
   intervalAfter  Int           // dias
+  response       Json?
   answeredAt     DateTime      @default(now())
 
   session ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([sessionId])
+  @@unique([sessionId, itemType, itemId])
   @@index([itemType, itemId]) // para reconstruir histórico de um item específico
   @@map("review_answers")
 }
