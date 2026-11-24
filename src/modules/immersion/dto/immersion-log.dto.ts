@@ -94,13 +94,20 @@ export class UpdateImmersionLogDto {
   @Max(1440)
   durationMinutes?: number;
 
-  @ApiPropertyOptional({ minimum: 0, maximum: 100, example: 70 })
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: 100,
+    example: 70,
+    description: 'Envie null para limpar a avaliação salva.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(100)
-  comprehension?: number;
+  comprehension?: number | null;
 
   @ApiPropertyOptional({ example: 'Revisitei com legendas' })
   @IsOptional()
