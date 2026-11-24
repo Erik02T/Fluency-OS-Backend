@@ -164,7 +164,14 @@ export class PlannerService {
       patch.category = dto.category;
       patch.kanjiGlyph = CATEGORY_META[dto.category].glyph;
     }
-    if (dto.date !== undefined) patch.date = dto.date;
+    if (dto.date !== undefined) {
+      if (!(await this.repository.findTaskById(userId, taskId))) {
+        throw new NotFoundException(`Planner task ${taskId} not found`);
+      }
+      const plan = await this.ensurePlanForDate(userId, dto.date);
+      patch.date = dto.date;
+      patch.weeklyPlanId = plan.id;
+    }
     if (dto.scheduledTime !== undefined)
       patch.scheduledTime = dto.scheduledTime;
     if (dto.estimatedMinutes !== undefined) {
@@ -403,6 +410,7 @@ export class PlannerService {
       const dayDate = addDays(startDate, index);
       return {
         date: Number(dayDate.slice(8, 10)),
+        isoDate: dayDate,
         day,
         isToday: dayDate === today,
       };
@@ -416,10 +424,14 @@ export class PlannerService {
     const goals = await this.repository.findGoals(plan.id);
     const currents = this.computeGoalCurrents(weekTasks);
     await this.repository.syncGoalCurrents(
-      goals.map((goal) => ({
-        id: goal.id,
-        currentValue: currents.get(goal.category) ?? 0,
-      })),
+      goals
+        .filter(
+          (goal) => goal.currentValue !== (currents.get(goal.category) ?? 0),
+        )
+        .map((goal) => ({
+          id: goal.id,
+          currentValue: currents.get(goal.category) ?? 0,
+        })),
     );
 
     const weeklyGoals: PlannerWeeklyGoalDto[] = goals.map((goal) => ({
@@ -445,7 +457,15 @@ export class PlannerService {
       todayDateLabel: formatDateLabel(today),
     };
 
-    return { week, habits, todayTasks, weeklyGoals, summary };
+    return {
+      todayDate: today,
+      selectedDate: baseDate,
+      week,
+      habits,
+      todayTasks,
+      weeklyGoals,
+      summary,
+    };
   }
 
   private buildHabits(

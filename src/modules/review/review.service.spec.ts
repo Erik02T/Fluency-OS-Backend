@@ -21,14 +21,12 @@ describe('ReviewService', () => {
   const findDueVocabularyProgressMock = jest.fn();
   const findUserPreferencesMock = jest.fn();
   const createSessionMock = jest.fn();
-  const findSessionByIdMock = jest.fn();
   const findSessionWithAnswersMock = jest.fn();
   const answerTransactionMock = jest.fn();
   const completeSessionMock = jest.fn();
   const abandonSessionMock = jest.fn();
   const findSessionsMock = jest.fn();
   const countSessionsMock = jest.fn();
-  const getSessionAnswerStatsMock = jest.fn();
 
   const baseSession = {
     id: 'session-123',
@@ -89,14 +87,12 @@ describe('ReviewService', () => {
             findDueVocabularyProgress: findDueVocabularyProgressMock,
             findUserPreferences: findUserPreferencesMock,
             createSession: createSessionMock,
-            findSessionById: findSessionByIdMock,
             findSessionWithAnswers: findSessionWithAnswersMock,
             answerTransaction: answerTransactionMock,
             completeSession: completeSessionMock,
             abandonSession: abandonSessionMock,
             findSessions: findSessionsMock,
             countSessions: countSessionsMock,
-            getSessionAnswerStats: getSessionAnswerStatsMock,
           },
         },
       ],
@@ -162,12 +158,11 @@ describe('ReviewService', () => {
   });
 
   describe('createSession', () => {
-    it('creates a kanji session with totalItems = due count', async () => {
-      countDueKanjiMock.mockResolvedValue(3);
-      countDueVocabularyMock.mockResolvedValue(10);
+    it('creates a kanji session from the exact cards returned by the due query', async () => {
+      findDueKanjiProgressMock.mockResolvedValue([dueKanjiProgress]);
       createSessionMock.mockResolvedValue({
         ...baseSession,
-        totalItems: 3,
+        totalItems: 1,
       });
 
       const result = await service.createSession('user-123', {
@@ -177,27 +172,30 @@ describe('ReviewService', () => {
       expect(createSessionMock).toHaveBeenCalledWith(
         'user-123',
         SRSItemType.KANJI,
-        3,
+        result.cards,
       );
       expect(result.session_type).toBe('kanji');
-      expect(result.total_items).toBe(3);
+      expect(result.total_items).toBe(1);
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards?.[0].item.id).toBe('kanji-1');
       expect(result.status).toBe('in_progress');
     });
 
     it('rejects unsupported session_type', async () => {
       await expect(
-        service.createSession('user-123', { session_type: 'sentence' }),
+        service.createSession('user-123', {
+          session_type: 'sentence' as never,
+        }),
       ).rejects.toThrow(BadRequestException);
       expect(createSessionMock).not.toHaveBeenCalled();
     });
 
     it('accepts camelCase alias sessionType', async () => {
-      countDueKanjiMock.mockResolvedValue(0);
-      countDueVocabularyMock.mockResolvedValue(2);
+      findDueVocabularyProgressMock.mockResolvedValue([]);
       createSessionMock.mockResolvedValue({
         ...baseSession,
         itemType: SRSItemType.VOCABULARY,
-        totalItems: 2,
+        totalItems: 0,
       });
 
       const result = await service.createSession('user-123', {
@@ -207,17 +205,17 @@ describe('ReviewService', () => {
       expect(createSessionMock).toHaveBeenCalledWith(
         'user-123',
         SRSItemType.VOCABULARY,
-        2,
+        [],
       );
       expect(result.session_type).toBe('vocabulary');
     });
 
-    it('caps totalItems by due count even when limit is higher', async () => {
-      countDueKanjiMock.mockResolvedValue(2);
-      countDueVocabularyMock.mockResolvedValue(0);
+    it('caps the card query by the user preference', async () => {
+      findDueKanjiProgressMock.mockResolvedValue([dueKanjiProgress]);
+      findUserPreferencesMock.mockResolvedValue({ srsMaxReviewsPerDay: 2 });
       createSessionMock.mockResolvedValue({
         ...baseSession,
-        totalItems: 2,
+        totalItems: 1,
       });
 
       await service.createSession('user-123', {
@@ -225,9 +223,9 @@ describe('ReviewService', () => {
         limit: 50,
       });
 
-      expect(createSessionMock).toHaveBeenCalledWith(
+      expect(findDueKanjiProgressMock).toHaveBeenCalledWith(
         'user-123',
-        SRSItemType.KANJI,
+        expect.any(Date),
         2,
       );
     });
@@ -270,20 +268,14 @@ describe('ReviewService', () => {
     it('returns SRS delta and session progress on success', async () => {
       answerTransactionMock.mockResolvedValue({
         ok: true,
-        progress: {
-          nextReviewAt: new Date('2026-01-05T10:00:00Z'),
-          isMastered: false,
-        },
-        answer: {
-          srsLevelBefore: 3,
-          srsLevelAfter: 4,
-          intervalBefore: 4,
-          intervalAfter: 10,
-        },
-        session: {
-          ...baseSession,
-          completedItems: 1,
-          correctItems: 1,
+        response: {
+          previous_srs_level: 3,
+          new_srs_level: 4,
+          previous_interval: 4,
+          new_interval: 10,
+          next_review_at: '2026-01-05T10:00:00.000Z',
+          is_mastered: false,
+          session_progress: { reviewed: 1, total: 2, correct: 1, incorrect: 0 },
         },
       });
 
@@ -410,7 +402,7 @@ describe('ReviewService', () => {
       expect(result.accuracy_rate).toBe(0.75);
     });
 
-    it('throws 409 when ending a completed session', async () => {
+    it('throws 409 when ending an abandoned session', async () => {
       completeSessionMock.mockResolvedValue({
         ok: false,
         reason: 'session_not_active',
@@ -512,7 +504,7 @@ describe('ReviewService', () => {
 
   describe('getSessionStats', () => {
     it('computes stats from session and answer aggregates', async () => {
-      findSessionByIdMock.mockResolvedValue({
+      findSessionWithAnswersMock.mockResolvedValue({
         ...baseSession,
         status: ReviewSessionStatus.COMPLETED,
         completedItems: 4,
@@ -520,16 +512,36 @@ describe('ReviewService', () => {
         accuracyRate: 0.75,
         durationSeconds: 90,
         completedAt: new Date('2026-01-01T10:01:30Z'),
-      });
-      getSessionAnswerStatsMock.mockResolvedValue({
-        counts: {
-          [ReviewQuality.BLACKOUT]: 0,
-          [ReviewQuality.WRONG]: 1,
-          [ReviewQuality.CORRECT_HARD]: 2,
-          [ReviewQuality.CORRECT_EASY]: 1,
-        },
-        averageResponseTimeMs: 2500,
-        masteredCount: 1,
+        answers: [
+          {
+            itemType: 'KANJI',
+            quality: ReviewQuality.WRONG,
+            responseTimeMs: 2000,
+            srsLevelBefore: 2,
+            srsLevelAfter: 1,
+          },
+          {
+            itemType: 'KANJI',
+            quality: ReviewQuality.CORRECT_HARD,
+            responseTimeMs: 2000,
+            srsLevelBefore: 1,
+            srsLevelAfter: 2,
+          },
+          {
+            itemType: 'KANJI',
+            quality: ReviewQuality.CORRECT_HARD,
+            responseTimeMs: 3500,
+            srsLevelBefore: 4,
+            srsLevelAfter: 5,
+          },
+          {
+            itemType: 'KANJI',
+            quality: ReviewQuality.CORRECT_EASY,
+            responseTimeMs: null,
+            srsLevelBefore: 2,
+            srsLevelAfter: 4,
+          },
+        ],
       });
 
       const result = await service.getSessionStats('user-123', 'session-123');
@@ -540,6 +552,7 @@ describe('ReviewService', () => {
       expect(result.accuracy_rate).toBe(0.75);
       expect(result.duration_seconds).toBe(90);
       expect(result.mastered_count).toBe(1);
+      expect(result.average_response_time_ms).toBe(2500);
       expect(result.quality_breakdown).toEqual({
         blackout: 0,
         wrong: 1,
@@ -549,7 +562,7 @@ describe('ReviewService', () => {
     });
 
     it('throws 404 for another user session (IDOR)', async () => {
-      findSessionByIdMock.mockResolvedValue({
+      findSessionWithAnswersMock.mockResolvedValue({
         ...baseSession,
         userId: 'other-user',
       });

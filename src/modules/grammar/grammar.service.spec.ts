@@ -125,6 +125,10 @@ describe('GrammarService', () => {
         {
           provide: UserGrammarProgressRepository,
           useValue: {
+            withPublishedPoint: (
+              _pointId: string,
+              work: (tx: object) => Promise<unknown>,
+            ) => work({}),
             findByUserAndGrammarPoint: progressFindByUserAndGrammarPointMock,
             findByUserAndGrammarPoints: progressFindByUserAndGrammarPointsMock,
             create: progressCreateMock,
@@ -181,7 +185,11 @@ describe('GrammarService', () => {
       action: 'study',
     });
 
-    expect(progressCreateMock).toHaveBeenCalledWith('user-123', 'grammar-123');
+    expect(progressCreateMock).toHaveBeenCalledWith(
+      'user-123',
+      'grammar-123',
+      {},
+    );
     expect(result.grammarPointId).toBe('grammar-123');
     expect(result.reviewCount).toBe(2);
   });

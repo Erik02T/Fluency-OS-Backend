@@ -63,6 +63,10 @@ export class KanjiFiltersDto {
   @IsBoolean()
   suspended?: boolean;
 
+  @IsOptional()
+  @IsIn(['true'])
+  studied?: 'true';
+
   @Type(() => Number)
   @Min(1)
   page: number = 1;

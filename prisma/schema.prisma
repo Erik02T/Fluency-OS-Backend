@@ -554,6 +554,36 @@ model UserGrammarProgress {
   @@map("user_grammar_progress")
 }
 
+model GrammarPipelineRun {
+  id             String   @id @default(cuid())
+  idempotencyKey String?  @unique
+  operation      String
+  level          JLPTLevel?
+  rollbackId     String?
+  dryRun         Boolean
+  httpStatus     Int?
+  result         Json?
+  createdAt      DateTime @default(now())
+  finishedAt     DateTime?
+  rollback       GrammarPipelineRollback?
+
+  @@index([createdAt])
+  @@map("grammar_pipeline_runs")
+}
+
+model GrammarPipelineRollback {
+  id        String    @id @default(cuid())
+  runId     String    @unique
+  level     JLPTLevel
+  changes   Json
+  createdAt DateTime  @default(now())
+  appliedAt DateTime?
+  run       GrammarPipelineRun @relation(fields: [runId], references: [id])
+
+  @@index([createdAt])
+  @@map("grammar_pipeline_rollbacks")
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MÓDULO: REVISÃO SRS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -563,6 +593,7 @@ model ReviewSession {
   userId          String
   status          ReviewSessionStatus @default(IN_PROGRESS)
   itemType        SRSItemType         @default(KANJI)
+  cards          Json                @default("[]")
   totalItems      Int                 @default(0)
   completedItems  Int                 @default(0)
   correctItems    Int                 @default(0)
@@ -594,11 +625,12 @@ model ReviewAnswer {
   srsLevelAfter  Int
   intervalBefore Int           // dias
   intervalAfter  Int           // dias
+  response       Json?
   answeredAt     DateTime      @default(now())
 
   session ReviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  @@index([sessionId])
+  @@unique([sessionId, itemType, itemId])
   @@index([itemType, itemId]) // para reconstruir histórico de um item específico
   @@map("review_answers")
 }

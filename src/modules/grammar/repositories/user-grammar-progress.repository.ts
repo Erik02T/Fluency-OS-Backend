@@ -7,11 +7,24 @@ import { UserGrammarProgressEntity } from '../types/grammar.types';
 export class UserGrammarProgressRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  withPublishedPoint<T>(
+    grammarPointId: string,
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const [point] = await tx.$queryRaw<{ id: string }[]>`SELECT "id"
+        FROM "grammar_points" WHERE "id" = ${grammarPointId}
+        AND "reviewStatus" = 'PUBLISHED' FOR UPDATE`;
+      return point ? work(tx) : null;
+    });
+  }
+
   async findByUserAndGrammarPoint(
     userId: string,
     grammarPointId: string,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<UserGrammarProgressEntity | null> {
-    return this.prisma.userGrammarProgress.findUnique({
+    return db.userGrammarProgress.findUnique({
       where: {
         userId_grammarPointId: { userId, grammarPointId },
       },
@@ -39,8 +52,9 @@ export class UserGrammarProgressRepository {
   async create(
     userId: string,
     grammarPointId: string,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<UserGrammarProgressEntity> {
-    return this.prisma.userGrammarProgress.create({
+    return db.userGrammarProgress.create({
       data: {
         userId,
         grammarPointId,
@@ -54,8 +68,9 @@ export class UserGrammarProgressRepository {
     userId: string,
     grammarPointId: string,
     data: Prisma.UserGrammarProgressUpdateInput,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<UserGrammarProgressEntity> {
-    return this.prisma.userGrammarProgress.update({
+    return db.userGrammarProgress.update({
       where: {
         userId_grammarPointId: { userId, grammarPointId },
       },

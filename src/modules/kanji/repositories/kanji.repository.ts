@@ -361,6 +361,12 @@ export class KanjiRepository {
       conditions.push({ grade: filters.grade });
     }
 
+    if (filters.studied) {
+      conditions.push(
+        userId ? { userProgress: { some: { userId } } } : { id: { in: [] } },
+      );
+    }
+
     if (filters.search && filters.search.length > 0) {
       conditions.push({
         OR: [

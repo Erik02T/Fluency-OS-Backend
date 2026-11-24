@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, JLPTLevel } from '@prisma/client';
+import { Prisma, JLPTLevel, ReviewStatus } from '@prisma/client';
 import { PrismaService } from '../../auth/repositories/prisma.service';
 import {
   CreateGrammarPointDto,
@@ -41,9 +41,12 @@ export class GrammarRepository {
     return this.prisma.grammarPoint.count({ where: this.buildWhere(filters) });
   }
 
-  findByIdFull(id: string): Promise<GrammarDetailEntity | null> {
+  findByIdFull(
+    id: string,
+    reviewStatus?: ReviewStatus,
+  ): Promise<GrammarDetailEntity | null> {
     return this.prisma.grammarPoint.findUnique({
-      where: { id },
+      where: { id, reviewStatus },
       include: grammarDetailInclude,
     });
   }

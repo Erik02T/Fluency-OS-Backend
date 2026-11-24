@@ -5,6 +5,7 @@ import { PrismaService } from '../auth/repositories/prisma.service';
 import { GrammarController } from './grammar.controller';
 import { AdminGrammarController } from './admin-grammar.controller';
 import { GrammarService } from './grammar.service';
+import { GrammarPipelineService } from './grammar-pipeline.service';
 import {
   GrammarRepository,
   UserGrammarProgressRepository,
@@ -15,6 +16,7 @@ import {
   controllers: [GrammarController, AdminGrammarController],
   providers: [
     GrammarService,
+    GrammarPipelineService,
     GrammarRepository,
     UserGrammarProgressRepository,
     PrismaService,

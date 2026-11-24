@@ -20,11 +20,14 @@ type SortOrder = 'asc' | 'desc';
 export class VocabularyRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(filters: VocabularyFiltersDto): Promise<VocabularyListEntity[]> {
+  findAll(
+    filters: VocabularyFiltersDto,
+    userId?: string,
+  ): Promise<VocabularyListEntity[]> {
     const skip = (filters.page - 1) * filters.perPage;
 
     return this.prisma.vocabulary.findMany({
-      where: this.buildWhere(filters),
+      where: this.buildWhere(filters, userId),
       orderBy: this.buildOrderBy(filters.sort, filters.order),
       skip,
       take: filters.perPage,
@@ -32,8 +35,10 @@ export class VocabularyRepository {
     });
   }
 
-  count(filters: VocabularyFiltersDto): Promise<number> {
-    return this.prisma.vocabulary.count({ where: this.buildWhere(filters) });
+  count(filters: VocabularyFiltersDto, userId?: string): Promise<number> {
+    return this.prisma.vocabulary.count({
+      where: this.buildWhere(filters, userId),
+    });
   }
 
   findByIdFull(id: string): Promise<VocabularyDetailEntity | null> {
@@ -177,11 +182,17 @@ export class VocabularyRepository {
 
   private buildWhere(
     filters: VocabularyFiltersDto,
+    userId?: string,
   ): Prisma.VocabularyWhereInput {
     const where: Prisma.VocabularyWhereInput = {};
 
     if (filters.jlpt) {
       where.jlptLevel = filters.jlpt;
+    }
+
+    if (filters.studied) {
+      if (userId) where.userProgress = { some: { userId } };
+      else where.id = { in: [] };
     }
 
     if (filters.search) {
@@ -209,17 +220,22 @@ export class VocabularyRepository {
     const sortOrder = order || 'asc';
 
     if (sortField === 'jlpt') {
-      return [{ jlptLevel: sortOrder }, { frequency: 'asc' }, { word: 'asc' }];
+      return [
+        { jlptLevel: sortOrder },
+        { frequency: 'asc' },
+        { word: 'asc' },
+        { id: 'asc' },
+      ];
     }
 
     if (sortField === 'word') {
-      return [{ word: sortOrder }];
+      return [{ word: sortOrder }, { id: 'asc' }];
     }
 
     if (sortField === 'createdAt') {
-      return [{ createdAt: sortOrder }];
+      return [{ createdAt: sortOrder }, { id: 'asc' }];
     }
 
-    return [{ frequency: sortOrder }, { word: 'asc' }];
+    return [{ frequency: sortOrder }, { word: 'asc' }, { id: 'asc' }];
   }
 }

@@ -1,97 +1,140 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JLPTLevel } from '@prisma/client';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import {
+  SrsDetailProgressDto,
+  SrsListProgressDto,
+} from '../../../common/dto/srs-progress.dto';
 
-// Resposta de lista (GET /kanji)
-export class KanjiListResponseDto {
+class KanjiSummaryDto {
+  @ApiProperty()
   id!: string;
+
+  @ApiProperty()
   character!: string;
+
+  @ApiProperty({ enum: JLPTLevel })
+  jlpt!: JLPTLevel;
+
+  @ApiProperty({ type: 'integer' })
+  strokes!: number;
+
+  @ApiProperty({ type: 'integer' })
+  frequency!: number;
+
+  @ApiProperty({ type: 'integer' })
+  grade!: number;
+}
+
+export class KanjiListResponseDto extends KanjiSummaryDto {
+  @ApiProperty({ type: [String] })
   meanings!: string[];
+
+  @ApiProperty({ type: [String] })
   onyomi!: string[];
+
+  @ApiProperty({ type: [String] })
   kunyomi!: string[];
-  jlpt!: JLPTLevel;
-  strokes!: number;
-  frequency!: number;
-  grade!: number;
 
-  // Progresso do usuário (pode ser null se não tiver progresso)
-  userProgress?: {
-    srsLevel: number;
-    isMastered: boolean;
-    isFavorited: boolean;
-    isSuspended: boolean;
-  };
+  @ApiPropertyOptional({ type: SrsListProgressDto })
+  userProgress?: SrsListProgressDto;
 }
 
-// Resposta paginada
 export class PaginatedKanjiResponseDto {
+  @ApiProperty({ type: [KanjiListResponseDto] })
   data!: KanjiListResponseDto[];
-  pagination!: {
-    page: number;
-    perPage: number;
-    total: number;
-    pages: number;
-  };
+
+  @ApiProperty({ type: PaginationDto })
+  pagination!: PaginationDto;
 }
 
-// Resposta de detalhe (GET /kanji/:id)
-export class KanjiDetailResponseDto {
-  id!: string;
-  character!: string;
-  unicodeCodepoint!: string;
+class KanjiMeaningDto {
+  @ApiProperty()
+  meaning!: string;
+
+  @ApiProperty()
+  language!: string;
+
+  @ApiProperty()
+  isPrimary!: boolean;
+}
+
+class KanjiReadingDto {
+  @ApiProperty()
+  reading!: string;
+
+  @ApiProperty()
+  romanization!: string;
+}
+
+class KanjiCommonReadingDto extends KanjiReadingDto {
+  @ApiProperty()
+  isCommon!: boolean;
+}
+
+class KanjiReadingsDto {
+  @ApiProperty({ type: [KanjiCommonReadingDto] })
+  onyomi!: KanjiCommonReadingDto[];
+
+  @ApiProperty({ type: [KanjiCommonReadingDto] })
+  kunyomi!: KanjiCommonReadingDto[];
+
+  @ApiPropertyOptional({ type: [KanjiReadingDto] })
+  nanori?: KanjiReadingDto[];
+}
+
+class KanjiExampleDto {
+  @ApiProperty()
+  word!: string;
+
+  @ApiProperty()
+  reading!: string;
+
+  @ApiProperty()
+  meaning!: string;
+
+  @ApiProperty({ enum: JLPTLevel })
   jlpt!: JLPTLevel;
-  strokes!: number;
-  frequency!: number;
-  grade!: number;
 
-  meanings!: Array<{
-    meaning: string;
-    language: string;
-    isPrimary: boolean;
-  }>;
+  @ApiPropertyOptional()
+  audioUrl?: string;
+}
 
-  readings!: {
-    onyomi: Array<{
-      reading: string;
-      romanization: string;
-      isCommon: boolean;
-    }>;
-    kunyomi: Array<{
-      reading: string;
-      romanization: string;
-      isCommon: boolean;
-    }>;
-    nanori?: Array<{
-      reading: string;
-      romanization: string;
-    }>;
-  };
+class KanjiRadicalDto {
+  @ApiProperty()
+  character!: string;
 
-  examples!: Array<{
-    word: string;
-    reading: string;
-    meaning: string;
-    jlpt: JLPTLevel;
-    audioUrl?: string;
-  }>;
+  @ApiProperty()
+  name!: string;
 
-  radicals!: Array<{
-    character: string;
-    name: string;
-    meaning: string;
-    isPrimary: boolean;
-  }>;
+  @ApiProperty()
+  meaning!: string;
 
-  // Progresso do usuário
-  userProgress?: {
-    srsLevel: number;
-    isMastered: boolean;
-    isFavorited: boolean;
-    isSuspended: boolean;
-    easeFactor: number;
-    intervalDays: number;
-    nextReviewAt: Date;
-    lastReviewedAt?: Date;
-    totalReviews: number;
-    correctReviews: number;
-    streak: number;
-  };
+  @ApiProperty()
+  isPrimary!: boolean;
+}
+
+class KanjiDetailProgressDto extends SrsDetailProgressDto {
+  @ApiProperty({ type: 'integer' })
+  streak!: number;
+}
+
+export class KanjiDetailResponseDto extends KanjiSummaryDto {
+  @ApiProperty()
+  unicodeCodepoint!: string;
+
+  @ApiProperty({ type: [KanjiMeaningDto] })
+  meanings!: KanjiMeaningDto[];
+
+  @ApiProperty({ type: KanjiReadingsDto })
+  readings!: KanjiReadingsDto;
+
+  @ApiProperty({ type: [KanjiExampleDto] })
+  examples!: KanjiExampleDto[];
+
+  @ApiProperty({ type: [KanjiRadicalDto] })
+  radicals!: KanjiRadicalDto[];
+
+  @ApiPropertyOptional({ type: KanjiDetailProgressDto })
+  userProgress?: KanjiDetailProgressDto;
 }

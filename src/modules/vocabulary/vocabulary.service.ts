@@ -38,9 +38,10 @@ export class VocabularyService {
     filters: VocabularyFiltersDto,
     userId?: string,
   ): Promise<PaginatedVocabularyResponseDto> {
+    const progressOwner = filters.studied ? userId : undefined;
     const [items, total] = await Promise.all([
-      this.vocabularyRepository.findAll(filters),
-      this.vocabularyRepository.count(filters),
+      this.vocabularyRepository.findAll(filters, progressOwner),
+      this.vocabularyRepository.count(filters, progressOwner),
     ]);
 
     let progressMap = new Map<string, UserVocabularyProgressEntity>();

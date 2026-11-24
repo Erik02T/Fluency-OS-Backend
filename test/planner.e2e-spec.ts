@@ -445,6 +445,54 @@ describe('Planner E2E', () => {
     expect(response.body.status).toBe('PENDING');
   });
 
+  it('reagenda uma tarefa concluída para o plano de outra semana', async () => {
+    const date = new Date(Date.parse(`${today}T12:00:00Z`) + 7 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const taskUrl = `/planner/tasks/${firstTaskId}`;
+
+    await request(app.getHttpServer())
+      .patch(`${taskUrl}/complete`)
+      .set(authHeader(accessToken))
+      .send({ completed: true })
+      .expect(200);
+    const history = await request(app.getHttpServer())
+      .get(`${taskUrl}/history`)
+      .set(authHeader(accessToken))
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(taskUrl)
+      .set(authHeader(accessToken))
+      .send({ date, actualMinutes: 35 })
+      .expect(200);
+
+    const week = await request(app.getHttpServer())
+      .get('/planner/week')
+      .set(authHeader(accessToken))
+      .query({ date })
+      .expect(200);
+    assertWeekBody(week.body);
+    const nextWeekId = week.body.id;
+    expect(nextWeekId).not.toBe(planId);
+    await request(app.getHttpServer())
+      .get(taskUrl)
+      .set(authHeader(accessToken))
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          date,
+          weeklyPlanId: nextWeekId,
+          status: 'COMPLETED',
+          actualMinutes: 35,
+        });
+      });
+    await request(app.getHttpServer())
+      .get(`${taskUrl}/history`)
+      .set(authHeader(accessToken))
+      .expect(200, history.body);
+  });
+
   it('remove tarefa via DELETE', async () => {
     const taskId = extraTaskIds.pop() as string;
     const response = await request(app.getHttpServer())

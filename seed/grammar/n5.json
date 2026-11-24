@@ -1,2 +1,642 @@
-[]
-
+[
+  {
+    "id": "N5-001",
+    "pattern": "です",
+    "jlpt": "N5",
+    "position": 1,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-001:01",
+        "japanese": "私は学生です。",
+        "reading": "わたしはがくせいです。",
+        "translation": "Sou estudante.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-002",
+    "pattern": "も",
+    "jlpt": "N5",
+    "position": 2,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-002:01",
+        "japanese": "私もコーヒーを飲みます。",
+        "reading": "わたしもコーヒーをのみます。",
+        "translation": "Eu tamb?m bebo caf?.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-003",
+    "pattern": "で",
+    "jlpt": "N5",
+    "position": 3,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-003:01",
+        "japanese": "図書館で勉強します。",
+        "reading": "としょかんでべんきょうします。",
+        "translation": "Estudo na biblioteca.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-004",
+    "pattern": "に/へ",
+    "jlpt": "N5",
+    "position": 4,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-004:01",
+        "japanese": "明日、京都へ行きます。",
+        "reading": "あした、きょうとへいきます。",
+        "translation": "Amanh?, vou para Quioto.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-005",
+    "pattern": "に",
+    "jlpt": "N5",
+    "position": 5,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-005:01",
+        "japanese": "七時に起きます。",
+        "reading": "しちじにおきます。",
+        "translation": "Acordo ?s sete horas.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-006",
+    "pattern": "を",
+    "jlpt": "N5",
+    "position": 6,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-006:01",
+        "japanese": "毎朝、水を飲みます。",
+        "reading": "まいあさ、みずをのみます。",
+        "translation": "Bebo ?gua todas as manh?s.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-007",
+    "pattern": "〜ませんか",
+    "jlpt": "N5",
+    "position": 7,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-007:01",
+        "japanese": "一緒に昼ご飯を食べませんか。",
+        "reading": "いっしょにひるごはんをたべませんか。",
+        "translation": "Vamos almo?ar juntos?",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-008",
+    "pattern": "は",
+    "jlpt": "N5",
+    "position": 8,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-008:01",
+        "japanese": "この本はおもしろいです。",
+        "reading": "このほんはおもしろいです。",
+        "translation": "Este livro ? interessante.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-009",
+    "pattern": "〜があります",
+    "jlpt": "N5",
+    "position": 9,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-009:01",
+        "japanese": "机の上に本があります。",
+        "reading": "つくえのうえにほんがあります。",
+        "translation": "H? um livro sobre a mesa.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-010",
+    "pattern": "〜がいます",
+    "jlpt": "N5",
+    "position": 10,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-010:01",
+        "japanese": "庭に猫がいます。",
+        "reading": "にわにねこがいます。",
+        "translation": "H? um gato no jardim.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-011",
+    "pattern": "と",
+    "jlpt": "N5",
+    "position": 11,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-011:01",
+        "japanese": "友達と映画を見ます。",
+        "reading": "ともだちとえいがをみます。",
+        "translation": "Vou ver um filme com um amigo.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-012",
+    "pattern": "〜ましょう",
+    "jlpt": "N5",
+    "position": 12,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-012:01",
+        "japanese": "駅まで歩きましょう。",
+        "reading": "えきまであるきましょう。",
+        "translation": "Vamos a p? at? a esta??o.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-013",
+    "pattern": "〜ましょうか",
+    "jlpt": "N5",
+    "position": 13,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-013:01",
+        "japanese": "荷物を持ちましょうか。",
+        "reading": "にもつをもちましょうか。",
+        "translation": "Quer que eu carregue a bagagem?",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-014",
+    "pattern": "〜てください",
+    "jlpt": "N5",
+    "position": 14,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-014:01",
+        "japanese": "ここに名前を書いてください。",
+        "reading": "ここになまえをかいてください。",
+        "translation": "Por favor, escreva seu nome aqui.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-015",
+    "pattern": "〜てもいいです",
+    "jlpt": "N5",
+    "position": 15,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-015:01",
+        "japanese": "ここに座ってもいいですか。",
+        "reading": "ここにすわってもいいですか。",
+        "translation": "Posso sentar aqui?",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-016",
+    "pattern": "〜てはいけません",
+    "jlpt": "N5",
+    "position": 16,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-016:01",
+        "japanese": "ここで写真を撮ってはいけません。",
+        "reading": "ここでしゃしんをとってはいけません。",
+        "translation": "? proibido tirar fotos aqui.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-017",
+    "pattern": "〜から",
+    "jlpt": "N5",
+    "position": 17,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-017:01",
+        "japanese": "雨が降っていますから、家にいます。",
+        "reading": "あめがふっていますから、いえにいます。",
+        "translation": "Vou ficar em casa porque est? chovendo.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-018",
+    "pattern": "〜ている",
+    "jlpt": "N5",
+    "position": 18,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-018:01",
+        "japanese": "妹は今、本を読んでいる。",
+        "reading": "いもうとはいま、ほんをよんでいる。",
+        "translation": "Minha irm? mais nova est? lendo um livro agora.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-019",
+    "pattern": "〜にいく",
+    "jlpt": "N5",
+    "position": 19,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-019:01",
+        "japanese": "スーパーへ牛乳を買いに行きます。",
+        "reading": "スーパーへぎゅうにゅうをかいにいきます。",
+        "translation": "Vou ao supermercado comprar leite.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-020",
+    "pattern": "ないでください",
+    "jlpt": "N5",
+    "position": 20,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-020:01",
+        "japanese": "窓を開けないでください。",
+        "reading": "まどをあけないでください。",
+        "translation": "Por favor, n?o abra a janela.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-021",
+    "pattern": "〜のがすきです",
+    "jlpt": "N5",
+    "position": 21,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-021:01",
+        "japanese": "私は歌うのが好きです。",
+        "reading": "わたしはうたうのがすきです。",
+        "translation": "Gosto de cantar.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-022",
+    "pattern": "〜のがじょうずです",
+    "jlpt": "N5",
+    "position": 22,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-022:01",
+        "japanese": "兄は絵を描くのが上手です。",
+        "reading": "あにはえをかくのがじょうずです。",
+        "translation": "Meu irm?o mais velho desenha bem.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-023",
+    "pattern": "〜のがへたです",
+    "jlpt": "N5",
+    "position": 23,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-023:01",
+        "japanese": "私は泳ぐのが下手です。",
+        "reading": "わたしはおよぐのがへたです。",
+        "translation": "N?o sei nadar bem.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-024",
+    "pattern": "まだ〜ていません",
+    "jlpt": "N5",
+    "position": 24,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-024:01",
+        "japanese": "宿題はまだ終わっていません。",
+        "reading": "しゅくだいはまだおわっていません。",
+        "translation": "A li??o de casa ainda n?o est? pronta.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-025",
+    "pattern": "〜のほうが〜より",
+    "jlpt": "N5",
+    "position": 25,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-025:01",
+        "japanese": "電車のほうがバスより速いです。",
+        "reading": "でんしゃのほうがバスよりはやいです。",
+        "translation": "O trem ? mais r?pido que o ?nibus.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-026",
+    "pattern": "〜のなかで〜がいちばん〜",
+    "jlpt": "N5",
+    "position": 26,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-026:01",
+        "japanese": "果物の中で、りんごが一番好きです。",
+        "reading": "くだもののなかで、りんごがいちばんすきです。",
+        "translation": "De todas as frutas, ma?? ? a minha preferida.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-027",
+    "pattern": "つもりです",
+    "jlpt": "N5",
+    "position": 27,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-027:01",
+        "japanese": "来年、日本に行くつもりです。",
+        "reading": "らいねん、にほんにいくつもりです。",
+        "translation": "Pretendo ir ao Jap?o no ano que vem.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-028",
+    "pattern": "〜く/〜になる",
+    "jlpt": "N5",
+    "position": 28,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-028:01",
+        "japanese": "夜になると、寒くなります。",
+        "reading": "よるになると、さむくなります。",
+        "translation": "Quando anoitece, fica frio.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-029",
+    "pattern": "stem+たいです",
+    "jlpt": "N5",
+    "position": 29,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-029:01",
+        "japanese": "新しい自転車を買いたいです。",
+        "reading": "あたらしいじてんしゃをかいたいです。",
+        "translation": "Quero comprar uma bicicleta nova.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-030",
+    "pattern": "〜たり…〜たりする",
+    "jlpt": "N5",
+    "position": 30,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-030:01",
+        "japanese": "日曜日は本を読んだり、音楽を聞いたりします。",
+        "reading": "にちようびはほんをよんだり、おんがくをきいたりします。",
+        "translation": "Aos domingos, fa?o coisas como ler e ouvir m?sica.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-031",
+    "pattern": "〜たことがある",
+    "jlpt": "N5",
+    "position": 31,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-031:01",
+        "japanese": "富士山に登ったことがあります。",
+        "reading": "ふじさんにのぼったことがあります。",
+        "translation": "J? subi o monte Fuji.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-032",
+    "pattern": "や",
+    "jlpt": "N5",
+    "position": 32,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-032:01",
+        "japanese": "机の上に本や鉛筆があります。",
+        "reading": "つくえのうえにほんやえんぴつがあります。",
+        "translation": "Sobre a mesa h? livros, l?pis e outras coisas.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-033",
+    "pattern": "〜んです",
+    "jlpt": "N5",
+    "position": 33,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-033:01",
+        "japanese": "どうして遅れたんですか。",
+        "reading": "どうしておくれたんですか。",
+        "translation": "Por que voc? se atrasou?",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-034",
+    "pattern": "〜すぎる",
+    "jlpt": "N5",
+    "position": 34,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-034:01",
+        "japanese": "この荷物は重すぎます。",
+        "reading": "このにもつはおもすぎます。",
+        "translation": "Esta bagagem ? pesada demais.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-035",
+    "pattern": "〜ほうがいい",
+    "jlpt": "N5",
+    "position": 35,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-035:01",
+        "japanese": "今日は早く寝たほうがいいです。",
+        "reading": "きょうははやくねたほうがいいです。",
+        "translation": "? melhor dormir cedo hoje.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-036",
+    "pattern": "ので",
+    "jlpt": "N5",
+    "position": 36,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-036:01",
+        "japanese": "明日は休みなので、家でゆっくりします。",
+        "reading": "あしたはやすみなので、いえでゆっくりします。",
+        "translation": "Como amanh? ? dia de folga, vou descansar em casa.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-037",
+    "pattern": "〜なくちゃいけない",
+    "jlpt": "N5",
+    "position": 37,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-037:01",
+        "japanese": "明日は早く起きなくちゃいけない。",
+        "reading": "あしたははやくおきなくちゃいけない。",
+        "translation": "Amanh? tenho que acordar cedo.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-038",
+    "pattern": "でしょう",
+    "jlpt": "N5",
+    "position": 38,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-038:01",
+        "japanese": "明日は晴れるでしょう。",
+        "reading": "あしたははれるでしょう。",
+        "translation": "Provavelmente far? sol amanh?.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-039",
+    "pattern": "〜まえに",
+    "jlpt": "N5",
+    "position": 39,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-039:01",
+        "japanese": "寝る前に歯を磨きます。",
+        "reading": "ねるまえにはをみがきます。",
+        "translation": "Escovo os dentes antes de dormir.",
+        "isNatural": false
+      }
+    ]
+  },
+  {
+    "id": "N5-040",
+    "pattern": "〜てから",
+    "jlpt": "N5",
+    "position": 40,
+    "source": "tanos",
+    "examples": [
+      {
+        "sourceId": "fluency-os:N5-040:01",
+        "japanese": "手を洗ってから、ご飯を食べます。",
+        "reading": "てをあらってから、ごはんをたべます。",
+        "translation": "Depois de lavar as m?os, eu como.",
+        "isNatural": false
+      }
+    ]
+  }
+]

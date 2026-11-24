@@ -1,142 +1,355 @@
-import type { ReviewSessionTypeValue } from './review-session.dto';
+import {
+  ApiExtraModels,
+  ApiProperty,
+  ApiPropertyOptional,
+  getSchemaPath,
+} from '@nestjs/swagger';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import {
+  REVIEW_HISTORY_STATUSES,
+  REVIEW_QUALITY_VALUES,
+  REVIEW_SESSION_TYPES,
+} from './review-session.dto';
 
-export type ReviewStatusValue = 'in_progress' | 'completed' | 'abandoned';
-export type ReviewItemTypeValue = 'kanji' | 'vocabulary' | 'sentence';
+const READABLE_REVIEW_TYPES = [...REVIEW_SESSION_TYPES, 'sentence'] as const;
+const QUALITY_NAMES = [
+  'blackout',
+  'wrong',
+  'correct_hard',
+  'correct_easy',
+] as const;
 
-export interface ReviewQueueKanjiItemDto {
-  id: string;
-  character: string;
-  meanings: string[];
-  readings: {
-    onyomi: string[];
-    kunyomi: string[];
-  };
-  jlpt: string;
-  strokes: number;
+export type ReviewStatusValue = (typeof REVIEW_HISTORY_STATUSES)[number];
+export type ReviewItemTypeValue = (typeof READABLE_REVIEW_TYPES)[number];
+
+class ReviewKanjiReadingsDto {
+  @ApiProperty({ type: [String] })
+  onyomi!: string[];
+
+  @ApiProperty({ type: [String] })
+  kunyomi!: string[];
+}
+
+export class ReviewQueueKanjiItemDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  character!: string;
+
+  @ApiProperty({ type: [String] })
+  meanings!: string[];
+
+  @ApiProperty({ type: ReviewKanjiReadingsDto })
+  readings!: ReviewKanjiReadingsDto;
+
+  @ApiProperty()
+  jlpt!: string;
+
+  @ApiProperty({ type: 'integer' })
+  strokes!: number;
+
+  @ApiPropertyOptional({ type: 'integer' })
   grade?: number;
+
+  @ApiPropertyOptional({ type: 'integer' })
   frequency?: number;
 }
 
-export interface ReviewQueueVocabularyItemDto {
-  id: string;
-  word: string;
-  reading: string;
-  meanings: string[];
+export class ReviewQueueVocabularyItemDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  word!: string;
+
+  @ApiProperty()
+  reading!: string;
+
+  @ApiProperty({ type: [String] })
+  meanings!: string[];
+
+  @ApiPropertyOptional({ type: String, nullable: true })
   jlpt?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
   partOfSpeech?: string | null;
 }
 
-export interface ReviewQueueItemDto {
-  progress_id: string;
-  item_type: ReviewItemTypeValue;
-  item:
-    | ReviewQueueKanjiItemDto
-    | ReviewQueueVocabularyItemDto
-    | Record<string, unknown>;
-  srs_level: number;
-  last_reviewed_at: string | null;
-  next_review_at: string;
-  review_count: number;
+class ReviewQueueCardDto {
+  @ApiProperty()
+  progress_id!: string;
+
+  @ApiProperty({ type: 'integer' })
+  srs_level!: number;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  last_reviewed_at!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  next_review_at!: string;
+
+  @ApiProperty({ type: 'integer' })
+  review_count!: number;
 }
 
-export interface ReviewQueueResponseDto {
-  total_due: number;
-  items: ReviewQueueItemDto[];
-  by_type: {
-    kanji: number;
-    vocabulary: number;
-    grammar: number;
-  };
+class ReviewQueueKanjiCardDto extends ReviewQueueCardDto {
+  @ApiProperty({ type: String, enum: ['kanji'] })
+  item_type!: 'kanji';
+
+  @ApiProperty({ type: ReviewQueueKanjiItemDto })
+  item!: ReviewQueueKanjiItemDto;
 }
 
-export interface ReviewQueueCountResponseDto {
-  kanji: number;
-  vocabulary: number;
-  total: number;
+class ReviewQueueVocabularyCardDto extends ReviewQueueCardDto {
+  @ApiProperty({ type: String, enum: ['vocabulary'] })
+  item_type!: 'vocabulary';
+
+  @ApiProperty({ type: ReviewQueueVocabularyItemDto })
+  item!: ReviewQueueVocabularyItemDto;
 }
 
-export interface ReviewAnswerItemDto {
-  id: string;
-  item_type: ReviewItemTypeValue;
-  item_id: string;
-  quality: number;
-  quality_name: string;
+export type ReviewQueueItemDto =
+  | ReviewQueueKanjiCardDto
+  | ReviewQueueVocabularyCardDto;
+
+const reviewCardsSchema = {
+  type: 'array' as const,
+  items: {
+    oneOf: [
+      { $ref: getSchemaPath(ReviewQueueKanjiCardDto) },
+      { $ref: getSchemaPath(ReviewQueueVocabularyCardDto) },
+    ],
+    discriminator: {
+      propertyName: 'item_type',
+      mapping: {
+        kanji: getSchemaPath(ReviewQueueKanjiCardDto),
+        vocabulary: getSchemaPath(ReviewQueueVocabularyCardDto),
+      },
+    },
+  },
+};
+
+class ReviewQueueTotalsDto {
+  @ApiProperty({ type: 'integer' })
+  kanji!: number;
+
+  @ApiProperty({ type: 'integer' })
+  vocabulary!: number;
+
+  @ApiProperty({
+    type: 'integer',
+    enum: [0],
+    description: 'Gramática usa revisão de compreensão fora da fila SRS.',
+  })
+  grammar!: number;
+}
+
+@ApiExtraModels(ReviewQueueKanjiCardDto, ReviewQueueVocabularyCardDto)
+export class ReviewQueueResponseDto {
+  @ApiProperty({ type: 'integer' })
+  total_due!: number;
+
+  @ApiProperty({ ...reviewCardsSchema })
+  items!: ReviewQueueItemDto[];
+
+  @ApiProperty({ type: ReviewQueueTotalsDto })
+  by_type!: ReviewQueueTotalsDto;
+}
+
+export class ReviewQueueCountResponseDto {
+  @ApiProperty({ type: 'integer' })
+  kanji!: number;
+
+  @ApiProperty({ type: 'integer' })
+  vocabulary!: number;
+
+  @ApiProperty({ type: 'integer' })
+  total!: number;
+}
+
+export class ReviewAnswerItemDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ enum: READABLE_REVIEW_TYPES })
+  item_type!: ReviewItemTypeValue;
+
+  @ApiProperty()
+  item_id!: string;
+
+  @ApiProperty({ enum: REVIEW_QUALITY_VALUES })
+  quality!: number;
+
+  @ApiProperty({ enum: QUALITY_NAMES })
+  quality_name!: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
   response_time_ms?: number | null;
-  srs_level_before: number;
-  srs_level_after: number;
-  interval_before: number;
-  interval_after: number;
-  answered_at: string;
+
+  @ApiProperty({ type: 'integer' })
+  srs_level_before!: number;
+
+  @ApiProperty({ type: 'integer' })
+  srs_level_after!: number;
+
+  @ApiProperty({ type: 'integer' })
+  interval_before!: number;
+
+  @ApiProperty({ type: 'integer' })
+  interval_after!: number;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  answered_at!: string;
 }
 
-export interface ReviewSessionResponseDto {
-  id: string;
-  user_id: string;
-  session_type: ReviewItemTypeValue;
-  status: ReviewStatusValue;
-  total_items: number;
-  reviewed_items: number;
-  correct_items: number;
-  incorrect_items: number;
-  accuracy_rate: number | null;
-  duration_seconds: number | null;
-  started_at: string;
-  completed_at: string | null;
+@ApiExtraModels(ReviewQueueKanjiCardDto, ReviewQueueVocabularyCardDto)
+export class ReviewSessionResponseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  user_id!: string;
+
+  @ApiProperty({ enum: READABLE_REVIEW_TYPES })
+  session_type!: ReviewItemTypeValue;
+
+  @ApiProperty({ enum: REVIEW_HISTORY_STATUSES })
+  status!: ReviewStatusValue;
+
+  @ApiProperty({ type: 'integer' })
+  total_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  reviewed_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  correct_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  incorrect_items!: number;
+
+  @ApiProperty({ type: Number, nullable: true })
+  accuracy_rate!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  duration_seconds!: number | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  started_at!: string;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  completed_at!: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   abandoned_at?: string | null;
+
+  @ApiPropertyOptional({ ...reviewCardsSchema })
+  cards?: ReviewQueueItemDto[];
+
+  @ApiPropertyOptional({ type: [ReviewAnswerItemDto] })
   answers?: ReviewAnswerItemDto[];
 }
 
-export interface SessionProgressDto {
-  reviewed: number;
-  total: number;
-  correct: number;
-  incorrect: number;
+class SessionProgressDto {
+  @ApiProperty({ type: 'integer' })
+  reviewed!: number;
+
+  @ApiProperty({ type: 'integer' })
+  total!: number;
+
+  @ApiProperty({ type: 'integer' })
+  correct!: number;
+
+  @ApiProperty({ type: 'integer' })
+  incorrect!: number;
 }
 
-export interface ReviewAnswerResponseDto {
-  previous_srs_level: number;
-  new_srs_level: number;
-  previous_interval: number;
-  new_interval: number;
-  next_review_at: string;
-  is_mastered: boolean;
-  session_progress: SessionProgressDto;
+export class ReviewAnswerResponseDto {
+  @ApiProperty({ type: 'integer' })
+  previous_srs_level!: number;
+
+  @ApiProperty({ type: 'integer' })
+  new_srs_level!: number;
+
+  @ApiProperty({ type: 'integer' })
+  previous_interval!: number;
+
+  @ApiProperty({ type: 'integer' })
+  new_interval!: number;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  next_review_at!: string;
+
+  @ApiProperty()
+  is_mastered!: boolean;
+
+  @ApiProperty({ type: SessionProgressDto })
+  session_progress!: SessionProgressDto;
 }
 
-export interface ReviewPaginationDto {
-  page: number;
-  perPage: number;
-  total: number;
-  pages: number;
+export class PaginatedReviewSessionResponseDto {
+  @ApiProperty({ type: [ReviewSessionResponseDto] })
+  data!: ReviewSessionResponseDto[];
+
+  @ApiProperty({ type: PaginationDto })
+  pagination!: PaginationDto;
 }
 
-export interface PaginatedReviewSessionResponseDto {
-  data: ReviewSessionResponseDto[];
-  pagination: ReviewPaginationDto;
+export class QualityBreakdownDto {
+  @ApiProperty({ type: 'integer' })
+  blackout!: number;
+
+  @ApiProperty({ type: 'integer' })
+  wrong!: number;
+
+  @ApiProperty({ type: 'integer' })
+  correct_hard!: number;
+
+  @ApiProperty({ type: 'integer' })
+  correct_easy!: number;
 }
 
-export interface QualityBreakdownDto {
-  blackout: number;
-  wrong: number;
-  correct_hard: number;
-  correct_easy: number;
-}
+export class ReviewSessionStatsResponseDto {
+  @ApiProperty()
+  session_id!: string;
 
-export interface ReviewSessionStatsResponseDto {
-  session_id: string;
-  status: ReviewStatusValue;
-  session_type: ReviewItemTypeValue;
-  total_items: number;
-  reviewed_items: number;
-  correct_items: number;
-  incorrect_items: number;
-  accuracy_rate: number;
-  duration_seconds: number;
+  @ApiProperty({ enum: REVIEW_HISTORY_STATUSES })
+  status!: ReviewStatusValue;
+
+  @ApiProperty({ enum: READABLE_REVIEW_TYPES })
+  session_type!: ReviewItemTypeValue;
+
+  @ApiProperty({ type: 'integer' })
+  total_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  reviewed_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  correct_items!: number;
+
+  @ApiProperty({ type: 'integer' })
+  incorrect_items!: number;
+
+  @ApiProperty()
+  accuracy_rate!: number;
+
+  @ApiProperty({ type: 'integer' })
+  duration_seconds!: number;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
   average_response_time_ms?: number | null;
-  mastered_count: number;
-  quality_breakdown: QualityBreakdownDto;
-  started_at: string;
-  completed_at: string | null;
-}
 
-export type { ReviewSessionTypeValue };
+  @ApiProperty({ type: 'integer' })
+  mastered_count!: number;
+
+  @ApiProperty({ type: QualityBreakdownDto })
+  quality_breakdown!: QualityBreakdownDto;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  started_at!: string;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  completed_at!: string | null;
+}

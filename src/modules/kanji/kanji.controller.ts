@@ -19,6 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JLPTLevel } from '@prisma/client';
+import { ApiProgressBody } from '../../common/dto/api-progress-body';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { KanjiService } from './kanji.service';
@@ -44,8 +45,12 @@ export class KanjiController {
    */
   @Get()
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Listar kanjis com filtros' })
+  @ApiOperation({
+    summary: 'Listar kanjis com filtros',
+    description:
+      'O catálogo aceita visitantes. Com sessão válida, inclui progresso quando registrado e permite filtros pessoais.',
+    security: [{ 'access-token': [] }, {}],
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'perPage', required: false, type: Number, example: 20 })
   @ApiQuery({ name: 'jlpt', required: false, enum: JLPTLevel })
@@ -54,6 +59,12 @@ export class KanjiController {
   @ApiQuery({ name: 'favorites', required: false, type: Boolean })
   @ApiQuery({ name: 'mastered', required: false, type: Boolean })
   @ApiQuery({ name: 'suspended', required: false, type: Boolean })
+  @ApiQuery({
+    name: 'studied',
+    required: false,
+    enum: ['true'],
+    description: 'Somente itens do usuário autenticado',
+  })
   @ApiQuery({
     name: 'sort',
     required: false,
@@ -83,8 +94,10 @@ export class KanjiController {
    */
   @Get('search')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Buscar kanjis por termo (full-text)' })
+  @ApiOperation({
+    summary: 'Buscar kanjis por termo (full-text)',
+    security: [{ 'access-token': [] }, {}],
+  })
   @ApiQuery({ name: 'q', required: true, type: String, example: 'sol' })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
   @ApiResponse({
@@ -115,13 +128,12 @@ export class KanjiController {
    */
   @Get('search/:query')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Buscar kanjis por termo (legado via path param)',
+    security: [{ 'access-token': [] }, {}],
     deprecated: true,
   })
   @ApiParam({ name: 'query', type: String, example: '日' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'Resultados de busca retornados',
@@ -145,8 +157,10 @@ export class KanjiController {
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Obter detalhe completo de um kanji' })
+  @ApiOperation({
+    summary: 'Obter detalhe completo de um kanji',
+    security: [{ 'access-token': [] }, {}],
+  })
   @ApiParam({
     name: 'id',
     type: String,
@@ -182,9 +196,11 @@ export class KanjiController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
+  @ApiProgressBody(UpdateKanjiProgressDto, ['correct'])
   @ApiOperation({
-    summary:
-      'Estudar ou enviar kanji para revisão (cria/atualiza progresso SRS)',
+    summary: 'Marcar kanji como estudado ou registrar avaliação SRS',
+    description:
+      'study registra estudo. review registra uma avaliação e exige correct.',
   })
   @ApiParam({
     name: 'id',

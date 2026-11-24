@@ -168,34 +168,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Incrementar rate limit counter
-   * Chave: `rate_limit:{endpoint}:{userId|ip}`
-   * TTL: 60 segundos (janela de 1 minuto)
-   * @param key Identificador único (endpoint + userId ou IP)
-   * @returns Contagem atual
-   */
   async incrementRateLimit(
     key: string,
     windowSeconds: number = 60,
-  ): Promise<number> {
-    const fullKey = `rate_limit:${key}`;
+  ): Promise<{ count: number; ttlSeconds: number }> {
+    // Increment and initialize the window atomically.
+    const [count, ttlSeconds] = (await this.client.eval(
+      `
+      local count = redis.call('INCR', KEYS[1])
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl < 0 then
+        redis.call('EXPIRE', KEYS[1], ARGV[1])
+        ttl = tonumber(ARGV[1])
+      end
+      return {count, math.max(1, ttl)}
+      `,
+      1,
+      `rate_limit:${key}`,
+      windowSeconds,
+    )) as [number, number];
 
-    try {
-      const count = await this.client.incr(fullKey);
-
-      // Se é a primeira vez, definir TTL
-      if (count === 1) {
-        await this.client.expire(fullKey, windowSeconds);
-      }
-
-      return count;
-    } catch (error) {
-      this.logger.error(
-        `Failed to increment rate limit: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw error;
-    }
+    return { count, ttlSeconds };
   }
 
   /**

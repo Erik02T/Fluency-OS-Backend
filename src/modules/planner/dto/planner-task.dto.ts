@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -48,6 +49,7 @@ export class CreatePlannerTaskDto {
     description: 'YYYY-MM-DD no timezone do usuário',
   })
   @Matches(DATE_PATTERN, { message: 'date must be a YYYY-MM-DD string' })
+  @IsDateString({ strict: true })
   date!: string;
 
   @ApiPropertyOptional({ example: '19:30', description: 'HH:mm' })
@@ -91,6 +93,7 @@ export class UpdatePlannerTaskDto {
   @ApiPropertyOptional({ example: '2026-10-10' })
   @IsOptional()
   @Matches(DATE_PATTERN, { message: 'date must be a YYYY-MM-DD string' })
+  @IsDateString({ strict: true })
   date?: string;
 
   @ApiPropertyOptional({ example: '19:30' })

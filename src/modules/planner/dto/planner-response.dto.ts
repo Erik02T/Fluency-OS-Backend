@@ -102,6 +102,7 @@ export interface PlannerOverviewTaskDto {
 
 export interface PlannerWeekDayDto {
   date: number;
+  isoDate: string;
   day: string;
   isToday: boolean;
 }
@@ -137,6 +138,8 @@ export interface PlannerSummaryDto {
 }
 
 export interface PlannerOverviewResponseDto {
+  todayDate: string;
+  selectedDate: string;
   week: PlannerWeekDayDto[];
   habits: PlannerHabitDto[];
   todayTasks: PlannerOverviewTaskDto[];

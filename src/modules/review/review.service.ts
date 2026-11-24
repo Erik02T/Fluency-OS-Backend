@@ -13,6 +13,7 @@ import {
 import { logStructured } from '../../common/logging/structured-log';
 import {
   CreateReviewSessionDto,
+  EnqueueReviewItemDto,
   PaginatedReviewSessionResponseDto,
   ReviewAnswerItemDto,
   ReviewAnswerResponseDto,
@@ -46,7 +47,6 @@ const STATUS_TO_VALUE: Record<ReviewSessionStatus, ReviewStatusValue> = {
 const VALUE_TO_SRS_ITEM_TYPE: Record<string, SRSItemType> = {
   kanji: SRSItemType.KANJI,
   vocabulary: SRSItemType.VOCABULARY,
-  sentence: SRSItemType.SENTENCE,
 };
 
 const VALUE_TO_STATUS: Record<string, ReviewSessionStatus> = {
@@ -60,6 +60,21 @@ export class ReviewService {
   constructor(private readonly reviewRepository: ReviewRepository) {}
 
   // ─── Fila ───────────────────────────────────────────────────────────────────
+
+  async enqueue(userId: string, dto: EnqueueReviewItemDto): Promise<void> {
+    const result = await this.reviewRepository.enqueue(
+      userId,
+      dto.item_type,
+      dto.item_id,
+      new Date(),
+    );
+    if (result === 'missing') {
+      throw new NotFoundException('Item não encontrado');
+    }
+    if (result === 'suspended') {
+      throw new ConflictException('Item suspenso para revisão');
+    }
+  }
 
   async getQueue(userId: string): Promise<ReviewQueueResponseDto> {
     const now = new Date();
@@ -136,42 +151,66 @@ export class ReviewService {
     const typeValue = dto.session_type ?? dto.sessionType ?? 'kanji';
     const itemType = VALUE_TO_SRS_ITEM_TYPE[typeValue];
 
-    if (!itemType || itemType === SRSItemType.SENTENCE) {
+    if (!itemType) {
       throw new BadRequestException(`Unsupported session_type '${typeValue}'`);
     }
 
     const now = new Date();
-    const [kanjiDue, vocabularyDue, preferences] = await Promise.all([
-      this.reviewRepository.countDueKanji(userId, now),
-      this.reviewRepository.countDueVocabulary(userId, now),
-      this.reviewRepository.findUserPreferences(userId),
-    ]);
-
-    const dueCount = itemType === SRSItemType.KANJI ? kanjiDue : vocabularyDue;
+    const preferences = await this.reviewRepository.findUserPreferences(userId);
     const limit = preferences?.srsMaxReviewsPerDay ?? 200;
-    const totalItems = Math.min(dto.limit ?? dueCount, dueCount, limit);
+    const take = Math.min(dto.limit ?? limit, limit);
+    const cards: ReviewQueueItemDto[] =
+      itemType === SRSItemType.KANJI
+        ? (
+            await this.reviewRepository.findDueKanjiProgress(userId, now, take)
+          ).map((progress) => ({
+            progress_id: progress.id,
+            item_type: 'kanji',
+            item: this.toQueueKanjiItem(progress),
+            srs_level: progress.srsLevel,
+            last_reviewed_at: progress.lastReviewAt?.toISOString() ?? null,
+            next_review_at: progress.nextReviewAt.toISOString(),
+            review_count: progress.totalReviews,
+          }))
+        : (
+            await this.reviewRepository.findDueVocabularyProgress(
+              userId,
+              now,
+              take,
+            )
+          ).map((progress) => ({
+            progress_id: progress.id,
+            item_type: 'vocabulary',
+            item: this.toQueueVocabularyItem(progress),
+            srs_level: progress.srsLevel,
+            last_reviewed_at: progress.lastReviewAt?.toISOString() ?? null,
+            next_review_at: progress.nextReviewAt.toISOString(),
+            review_count: progress.totalReviews,
+          }));
 
     const session = await this.reviewRepository.createSession(
       userId,
       itemType,
-      totalItems,
+      cards,
     );
 
     logStructured('info', 'ReviewService', 'review.session.create.success', {
       sessionId: session.id,
       itemType,
-      totalItems,
+      totalItems: cards.length,
     });
 
-    return this.toSessionDto(session);
+    return { ...this.toSessionDto(session), cards };
   }
 
   async getSession(
     userId: string,
     sessionId: string,
   ): Promise<ReviewSessionResponseDto> {
-    const session =
-      await this.reviewRepository.findSessionWithAnswers(sessionId);
+    const session = await this.reviewRepository.findSessionWithAnswers(
+      sessionId,
+      userId,
+    );
 
     if (!session || session.userId !== userId) {
       throw new NotFoundException(
@@ -179,7 +218,15 @@ export class ReviewService {
       );
     }
 
-    return this.toSessionDto(session, session.answers);
+    return {
+      ...this.toSessionDto(
+        session,
+        session.answers.filter(
+          (answer) => answer.itemType === session.itemType,
+        ),
+      ),
+      cards: session.cards as unknown as ReviewQueueItemDto[],
+    };
   }
 
   async endSession(
@@ -265,7 +312,7 @@ export class ReviewService {
 
     const itemType = VALUE_TO_SRS_ITEM_TYPE[itemTypeValue];
 
-    if (!itemType || itemType === SRSItemType.SENTENCE) {
+    if (!itemType) {
       throw new BadRequestException(`Unsupported item_type '${itemTypeValue}'`);
     }
 
@@ -293,36 +340,29 @@ export class ReviewService {
           `Progress for ${itemTypeValue} ${itemId} not found`,
         );
       }
+      if (result.reason === 'card_not_in_session') {
+        throw new NotFoundException(
+          'Card does not belong to this review session',
+        );
+      }
+      if (result.reason === 'answer_conflict') {
+        throw new ConflictException(
+          'A review answer is already recorded for this card',
+        );
+      }
       throw new ConflictException(
         `Review session with id ${sessionId} is not in progress`,
       );
     }
 
-    const previousSrsLevel = result.answer.srsLevelBefore;
-    const previousInterval = result.answer.intervalBefore;
-    const session = result.session;
-
     logStructured('info', 'ReviewService', 'review.answer.success', {
       sessionId,
       itemId,
       quality,
-      newSrsLevel: result.answer.srsLevelAfter,
+      newSrsLevel: result.response.new_srs_level,
     });
 
-    return {
-      previous_srs_level: previousSrsLevel,
-      new_srs_level: result.answer.srsLevelAfter,
-      previous_interval: previousInterval,
-      new_interval: result.answer.intervalAfter,
-      next_review_at: result.progress.nextReviewAt.toISOString(),
-      is_mastered: result.progress.isMastered,
-      session_progress: {
-        reviewed: session.completedItems,
-        total: session.totalItems,
-        correct: session.correctItems,
-        incorrect: session.completedItems - session.correctItems,
-      },
-    };
+    return result.response;
   }
 
   // ─── Histórico ──────────────────────────────────────────────────────────────
@@ -366,7 +406,10 @@ export class ReviewService {
     userId: string,
     sessionId: string,
   ): Promise<ReviewSessionStatsResponseDto> {
-    const session = await this.reviewRepository.findSessionById(sessionId);
+    const session = await this.reviewRepository.findSessionWithAnswers(
+      sessionId,
+      userId,
+    );
 
     if (!session || session.userId !== userId) {
       throw new NotFoundException(
@@ -374,8 +417,19 @@ export class ReviewService {
       );
     }
 
-    const answerStats =
-      await this.reviewRepository.getSessionAnswerStats(sessionId);
+    const answers = session.answers.filter(
+      (answer) => answer.itemType === session.itemType,
+    );
+    const counts: Partial<Record<ReviewQuality, number>> = {};
+    const responseTimes: number[] = [];
+    let masteredCount = 0;
+    for (const answer of answers) {
+      counts[answer.quality] = (counts[answer.quality] ?? 0) + 1;
+      if (answer.responseTimeMs !== null)
+        responseTimes.push(answer.responseTimeMs);
+      if (answer.srsLevelBefore < 5 && answer.srsLevelAfter >= 5)
+        masteredCount++;
+    }
 
     const reviewedItems = session.completedItems;
     const correctItems = session.correctItems;
@@ -400,13 +454,16 @@ export class ReviewService {
       incorrect_items: reviewedItems - correctItems,
       accuracy_rate: accuracyRate,
       duration_seconds: durationSeconds,
-      average_response_time_ms: answerStats.averageResponseTimeMs,
-      mastered_count: answerStats.masteredCount,
+      average_response_time_ms: responseTimes.length
+        ? responseTimes.reduce((sum, time) => sum + time, 0) /
+          responseTimes.length
+        : null,
+      mastered_count: masteredCount,
       quality_breakdown: {
-        blackout: answerStats.counts[ReviewQuality.BLACKOUT] ?? 0,
-        wrong: answerStats.counts[ReviewQuality.WRONG] ?? 0,
-        correct_hard: answerStats.counts[ReviewQuality.CORRECT_HARD] ?? 0,
-        correct_easy: answerStats.counts[ReviewQuality.CORRECT_EASY] ?? 0,
+        blackout: counts[ReviewQuality.BLACKOUT] ?? 0,
+        wrong: counts[ReviewQuality.WRONG] ?? 0,
+        correct_hard: counts[ReviewQuality.CORRECT_HARD] ?? 0,
+        correct_easy: counts[ReviewQuality.CORRECT_EASY] ?? 0,
       },
       started_at: session.startedAt.toISOString(),
       completed_at: session.completedAt?.toISOString() ?? null,

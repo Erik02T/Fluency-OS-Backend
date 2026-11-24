@@ -19,6 +19,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JLPTLevel } from '@prisma/client';
+import { ApiProgressBody } from '../../common/dto/api-progress-body';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { VocabularyService } from './vocabulary.service';
@@ -37,10 +38,19 @@ export class VocabularyController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Listar vocabulário com filtros e paginação' })
+  @ApiOperation({
+    summary: 'Listar vocabulário com filtros e paginação',
+    security: [{ 'access-token': [] }, {}],
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'perPage', required: false, type: Number, example: 20 })
   @ApiQuery({ name: 'jlpt', required: false, enum: JLPTLevel })
+  @ApiQuery({
+    name: 'studied',
+    required: false,
+    enum: ['true'],
+    description: 'Somente itens do usuário autenticado',
+  })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -67,8 +77,10 @@ export class VocabularyController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Obter detalhe completo de um item de vocabulário' })
+  @ApiOperation({
+    summary: 'Obter detalhe completo de um item de vocabulário',
+    security: [{ 'access-token': [] }, {}],
+  })
   @ApiParam({
     name: 'id',
     type: String,
@@ -95,7 +107,12 @@ export class VocabularyController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Marcar vocabulário como estudado ou revisado' })
+  @ApiProgressBody(UpdateVocabularyProgressDto, ['correct'])
+  @ApiOperation({
+    summary: 'Marcar vocabulário como estudado ou registrar avaliação SRS',
+    description:
+      'study registra estudo. review registra uma avaliação e exige correct.',
+  })
   @ApiParam({
     name: 'id',
     type: String,
@@ -106,6 +123,10 @@ export class VocabularyController {
     status: 200,
     description: 'Progresso atualizado com sucesso',
     type: VocabularyProgressResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Payload inválido para a ação informada',
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Vocabulário não encontrado' })

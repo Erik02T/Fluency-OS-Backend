@@ -142,6 +142,7 @@ describe('Dashboard E2E (Fase 6)', () => {
 
       const grammarPoint = await prisma.grammarPoint.create({
         data: {
+          reviewStatus: 'PUBLISHED',
           pattern: `〜テスト${suffix}${i}`,
           jlptLevel: JLPTLevel.N4,
           title: `Gramática teste dashboard ${i}`,

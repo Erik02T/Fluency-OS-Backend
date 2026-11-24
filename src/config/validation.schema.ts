@@ -6,6 +6,7 @@ type EnvShape = {
   DB_IDLE_TIMEOUT?: string;
   REDIS_HOST?: string;
   REDIS_PORT?: string;
+  RATE_LIMIT_MAX_REQUESTS?: string;
   JWT_SECRET?: string;
   JWT_EXPIRATION?: string;
   JWT_REFRESH_SECRET?: string;
@@ -54,6 +55,13 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
 
   if (env.REDIS_PORT && Number.isNaN(Number(env.REDIS_PORT))) {
     throw new Error('REDIS_PORT must be a number');
+  }
+
+  if (env.RATE_LIMIT_MAX_REQUESTS !== undefined) {
+    const limit = Number(env.RATE_LIMIT_MAX_REQUESTS);
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new Error('RATE_LIMIT_MAX_REQUESTS must be a positive integer');
+    }
   }
 
   if (env.APP_PORT && Number.isNaN(Number(env.APP_PORT))) {

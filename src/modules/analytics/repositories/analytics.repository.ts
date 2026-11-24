@@ -66,9 +66,13 @@ export class AnalyticsRepository {
       this.prisma.userVocabularyProgress.count({
         where: { userId, isMastered: true },
       }),
-      this.prisma.grammarPoint.count(),
+      this.prisma.grammarPoint.count({ where: { reviewStatus: 'PUBLISHED' } }),
       this.prisma.userGrammarProgress.count({
-        where: { userId, isStudied: true },
+        where: {
+          userId,
+          isStudied: true,
+          grammarPoint: { reviewStatus: 'PUBLISHED' },
+        },
       }),
       this.prisma.userKanjiProgress.aggregate({
         where: { userId },
@@ -134,7 +138,12 @@ export class AnalyticsRepository {
     since: Date,
   ): Promise<GrammarStudiedRecord[]> {
     return this.prisma.userGrammarProgress.findMany({
-      where: { userId, isStudied: true, studiedAt: { gte: since } },
+      where: {
+        userId,
+        isStudied: true,
+        studiedAt: { gte: since },
+        grammarPoint: { reviewStatus: 'PUBLISHED' },
+      },
       select: { studiedAt: true },
     });
   }

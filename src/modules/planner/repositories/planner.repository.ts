@@ -30,6 +30,7 @@ export interface TaskPatch {
   kanjiGlyph?: string;
   date?: string;
   scheduledTime?: string;
+  weeklyPlanId?: string;
   estimatedMinutes?: number;
   actualMinutes?: number;
   priority?: PlannerTaskPriority;
@@ -162,6 +163,9 @@ export class PlannerRepository {
       if (patch.category !== undefined) data.category = patch.category;
       if (patch.kanjiGlyph !== undefined) data.kanjiGlyph = patch.kanjiGlyph;
       if (patch.date !== undefined) data.date = patch.date;
+      if (patch.weeklyPlanId !== undefined) {
+        data.weeklyPlan = { connect: { id: patch.weeklyPlanId } };
+      }
       if (patch.scheduledTime !== undefined) {
         data.scheduledTime = patch.scheduledTime;
       }

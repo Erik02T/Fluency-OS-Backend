@@ -13,6 +13,7 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
+    exposedHeaders: ['Retry-After'],
   });
 
   // Adicionar validação automática de DTO
