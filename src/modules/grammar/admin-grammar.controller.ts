@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -14,6 +15,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiParam,
   ApiQuery,
@@ -25,6 +27,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GrammarService } from './grammar.service';
+import { GrammarPipelineService } from './grammar-pipeline.service';
+import {
+  RollbackGrammarPipelineDto,
+  RunGrammarPipelineDto,
+} from './dto/grammar-pipeline.dto';
 import {
   CreateGrammarPointDto,
   GrammarFiltersDto,
@@ -35,27 +42,16 @@ import {
 } from './dto';
 import { logStructured } from '../../common/logging/structured-log';
 
-// FASE 16 - DTOs para administração do pipeline
-class PipelineOperationDto {
-  phase!: string;
-  level?: string;
-  dryRun?: boolean;
-  force?: boolean;
-}
-
-class RollbackOperationDto {
-  rollbackId!: string;
-  dryRun?: boolean;
-  force?: boolean;
-}
-
 @ApiTags('Admin Grammar')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 @Controller('admin/grammar-points')
 export class AdminGrammarController {
-  constructor(private readonly grammarService: GrammarService) {}
+  constructor(
+    private readonly grammarService: GrammarService,
+    private readonly pipeline: GrammarPipelineService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar pontos gramaticais para administração' })
@@ -232,84 +228,62 @@ export class AdminGrammarController {
     return this.grammarService.updateGrammarReviewStatus(id, dto);
   }
 
-  // FASE 16 - Endpoints de administração do pipeline
-
   @Post('pipeline/run')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Executar fase do pipeline de gramática' })
-  @ApiResponse({
-    status: 202,
-    description: 'Fase do pipeline iniciada com sucesso',
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Validar ou importar conteúdo de gramática' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Obrigatório para importação real',
   })
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async runPipelinePhase(
-    @Body() dto: PipelineOperationDto,
-  ): Promise<{ message: string; dryRun: boolean }> {
-    logStructured(
-      'info',
-      'AdminGrammarController',
-      'admin.grammar.pipeline.run',
-      {
-        phase: dto.phase,
-        level: dto.level,
-        dryRun: dto.dryRun,
-      },
-    );
+  @ApiResponse({ status: 200, description: 'Resultado registrado da operação' })
+  @ApiResponse({ status: 400, description: 'Parâmetros inválidos' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflito de chave ou de identidade do conteúdo',
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Conteúdo rejeitado pela validação',
+  })
+  runPipelinePhase(
+    @Body() dto: RunGrammarPipelineDto,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.pipeline.run(dto, key);
+  }
 
-    // Integrar com scripts do pipeline (scripts/grammar/*.ts)
-    // Por enquanto, retorna resposta placeholder
-    return {
-      message: `Pipeline phase ${dto.phase} ${dto.dryRun ? '(dry-run)' : ''} initiated`,
-      dryRun: dto.dryRun || false,
-    };
+  @Get('pipeline/runs')
+  @ApiOperation({ summary: 'Consultar o histórico de operações do pipeline' })
+  listPipelineRuns() {
+    return this.pipeline.listRuns();
   }
 
   @Get('pipeline/rollbacks')
   @ApiOperation({ summary: 'Listar rollbacks disponíveis' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de rollbacks disponíveis',
-  })
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async listRollbacks(): Promise<{ rollbacks: any[] }> {
-    logStructured(
-      'info',
-      'AdminGrammarController',
-      'admin.grammar.pipeline.rollbacks.list',
-      {},
-    );
-
-    // Integrar com sistema de rollback (scripts/utils/rollback.ts)
-    // Por enquanto, retorna lista vazia
-    return { rollbacks: [] };
+  listRollbacks() {
+    return this.pipeline.listRollbacks();
   }
 
   @Post('pipeline/rollback')
-  @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Executar rollback' })
-  @ApiResponse({
-    status: 202,
-    description: 'Rollback iniciado com sucesso',
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Simular ou executar a reversão de uma importação' })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Obrigatório para reversão real',
   })
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async executeRollback(
-    @Body() dto: RollbackOperationDto,
-  ): Promise<{ message: string; rollbackId: string }> {
-    logStructured(
-      'info',
-      'AdminGrammarController',
-      'admin.grammar.pipeline.rollback',
-      {
-        rollbackId: dto.rollbackId,
-        dryRun: dto.dryRun,
-      },
-    );
-
-    // Integrar com sistema de rollback (scripts/utils/rollback.ts)
-    // Por enquanto, retorna resposta placeholder
-    return {
-      message: `Rollback ${dto.rollbackId} ${dto.dryRun ? '(dry-run)' : ''} initiated`,
-      rollbackId: dto.rollbackId,
-    };
+  @ApiResponse({ status: 200, description: 'Resultado registrado da reversão' })
+  @ApiResponse({ status: 400, description: 'Parâmetros inválidos' })
+  @ApiResponse({ status: 404, description: 'Reversão não encontrada' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflito com alterações posteriores ou progresso de estudo',
+  })
+  executeRollback(
+    @Body() dto: RollbackGrammarPipelineDto,
+    @Headers('idempotency-key') key?: string,
+  ) {
+    return this.pipeline.rollback(dto, key);
   }
 }

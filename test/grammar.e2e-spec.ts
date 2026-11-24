@@ -4,6 +4,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/modules/auth/repositories/prisma.service';
+import { GrammarPipelineService } from '../src/modules/grammar/grammar-pipeline.service';
+import type { SeedGrammarRecord } from '../prisma/seed-grammar';
 
 interface LoginResponseBody {
   accessToken: string;
@@ -271,6 +273,224 @@ describe('Grammar E2E', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ action: 'study' })
       .expect(404);
+  });
+
+  it('simula, importa uma vez e reverte pontos e exemplos com histórico persistido', async () => {
+    const base = '/admin/grammar-points/pipeline';
+    const token = `Bearer ${adminAccessToken}`;
+    const importKey = `qa-import-${uniqueSuffix}`;
+    const rollbackKey = `qa-rollback-${uniqueSuffix}`;
+    const source = { source: `qa-${uniqueSuffix}`, sourceId: 'N5-001' };
+    const pipeline = app.get<{
+      readDataset(level: 'N5'): Promise<SeedGrammarRecord[]>;
+    }>(GrammarPipelineService);
+    const readDataset = pipeline.readDataset.bind(pipeline) as (
+      level: 'N5',
+    ) => Promise<SeedGrammarRecord[]>;
+    const isolatedDataset = jest
+      .spyOn(pipeline, 'readDataset')
+      .mockImplementation(async (level) =>
+        (await readDataset(level)).map((record) => ({
+          ...record,
+          source: source.source,
+        })),
+      );
+    const original = await prisma.grammarPoint.create({
+      data: {
+        ...source,
+        pattern: `pipeline-original-${uniqueSuffix}`,
+        title: 'Antes da importação',
+        shortExplanation: 'Antes da importação',
+        jlptLevel: 'N5',
+        reviewStatus: 'PUBLISHED',
+        examples: {
+          create: { japanese: '本です。', translation: 'É um livro.' },
+        },
+      },
+      include: { examples: true },
+    });
+    const body = { phase: 'import', level: 'N5' };
+    const run = () => request(app.getHttpServer()).post(`${base}/run`);
+    const revert = () =>
+      request(app.getHttpServer())
+        .post(`${base}/rollback`)
+        .set('Authorization', token);
+    try {
+      await run().send(body).expect(401);
+      await run()
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(body)
+        .expect(403);
+      await run()
+        .set('Authorization', token)
+        .send({ ...body, dryRun: 'false' })
+        .expect(400);
+      await run().set('Authorization', token).send(body).expect(400);
+      await run()
+        .set('Authorization', token)
+        .send({ phase: 'validate', level: 'N5' })
+        .expect(200)
+        .expect(({ body }: { body: unknown }) => {
+          expect(body).toMatchObject({
+            status: 'succeeded',
+            result: { valid: 40 },
+          });
+        });
+      await run()
+        .set('Authorization', token)
+        .send({ ...body, dryRun: true })
+        .expect(200)
+        .expect(({ body }: { body: unknown }) => {
+          expect(body).toMatchObject({
+            result: { created: 39, updated: 1, rollbackId: null },
+          });
+        });
+      expect(
+        await prisma.grammarPoint.findUnique({
+          where: { id: original.id },
+          include: { examples: true },
+        }),
+      ).toEqual(original);
+
+      const execute = () =>
+        run()
+          .set('Authorization', token)
+          .set('Idempotency-Key', importKey)
+          .send(body)
+          .expect(200);
+      const [first, retry] = await Promise.all([execute(), execute()]);
+      expect(retry.body).toEqual(first.body);
+      const operation = first.body as {
+        id: string;
+        result: { rollbackId: string };
+      };
+      const { rollbackId } = operation.result;
+      expect(
+        await prisma.grammarPoint.count({
+          where: { source: source.source, sourceId: { startsWith: 'N5-' } },
+        }),
+      ).toBe(40);
+      expect(
+        await prisma.grammarPoint.findUnique({
+          where: { id: original.id },
+          include: { examples: true },
+        }),
+      ).toMatchObject({
+        reviewStatus: 'PUBLISHED',
+        examples: [{ japanese: '私は学生です。' }],
+      });
+
+      await run()
+        .set('Authorization', token)
+        .set('Idempotency-Key', `${importKey}-new`)
+        .send(body)
+        .expect(200)
+        .expect(({ body }: { body: unknown }) => {
+          expect(body).toMatchObject({
+            result: { created: 0, updated: 0, unchanged: 40, rollbackId: null },
+          });
+        });
+      await request(app.getHttpServer())
+        .get(`${base}/rollbacks`)
+        .set('Authorization', token)
+        .expect(200)
+        .expect(({ body }: { body: { rollbacks: unknown[] } }) => {
+          expect(body.rollbacks).toContainEqual(
+            expect.objectContaining({ id: rollbackId, status: 'available' }),
+          );
+        });
+      await revert().send({ rollbackId: 'missing', dryRun: true }).expect(400);
+      await revert().send({ rollbackId, dryRun: true }).expect(200);
+      await prisma.grammarPoint.update({
+        where: { id: original.id },
+        data: { title: 'Edição posterior' },
+      });
+      await revert()
+        .set('Idempotency-Key', `${rollbackKey}-conflict`)
+        .send({ rollbackId })
+        .expect(409);
+      const entry = await prisma.grammarPipelineRollback.findUniqueOrThrow({
+        where: { id: rollbackId },
+      });
+      const [{ after }] = entry.changes as Array<{
+        after: { title: string; updatedAt: string };
+      }>;
+      await prisma.grammarPoint.update({
+        where: { id: original.id },
+        data: { title: after.title, updatedAt: after.updatedAt },
+      });
+      const applied = await revert()
+        .set('Idempotency-Key', rollbackKey)
+        .send({ rollbackId })
+        .expect(200);
+      const repeated = await revert()
+        .set('Idempotency-Key', rollbackKey)
+        .send({ rollbackId })
+        .expect(200);
+      expect(repeated.body).toEqual(applied.body);
+      expect(
+        await prisma.grammarPoint.findUnique({
+          where: { id: original.id },
+          include: { examples: true },
+        }),
+      ).toEqual(original);
+      await request(app.getHttpServer())
+        .get(`${base}/runs`)
+        .set('Authorization', token)
+        .expect(200)
+        .expect(({ body }: { body: { runs: unknown[] } }) => {
+          expect(body.runs).toContainEqual(
+            expect.objectContaining({ id: operation.id, status: 'succeeded' }),
+          );
+          expect(body.runs).toContainEqual(
+            expect.objectContaining({ rollbackId, status: 'failed' }),
+          );
+        });
+
+      // The second record fails after the first has already been updated.
+      await prisma.grammarPoint.createMany({
+        data: ['a', 'b'].map((suffix) => ({
+          source: source.source,
+          sourceId: 'N5-002',
+          jlptLevel: 'N5',
+          pattern: `pipeline-conflict-${uniqueSuffix}-${suffix}`,
+          title: 'Identidade ambígua',
+          shortExplanation: 'Fixture de reversão parcial',
+        })),
+      });
+      await run()
+        .set('Authorization', token)
+        .set('Idempotency-Key', `${importKey}-conflict`)
+        .send(body)
+        .expect(409);
+      expect(
+        await prisma.grammarPoint.findUnique({
+          where: { id: original.id },
+          include: { examples: true },
+        }),
+      ).toEqual(original);
+    } finally {
+      isolatedDataset.mockRestore();
+      await prisma.grammarPipelineRollback.deleteMany({
+        where: { run: { idempotencyKey: importKey } },
+      });
+      await prisma.grammarPipelineRun.deleteMany({
+        where: {
+          idempotencyKey: {
+            in: [
+              importKey,
+              `${importKey}-new`,
+              `${importKey}-conflict`,
+              rollbackKey,
+              `${rollbackKey}-conflict`,
+            ],
+          },
+        },
+      });
+      await prisma.grammarPoint.deleteMany({
+        where: { source: source.source },
+      });
+    }
   });
 
   describe('admin CRUD E2E', () => {
