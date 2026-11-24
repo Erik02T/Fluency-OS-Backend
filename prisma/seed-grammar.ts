@@ -1,6 +1,13 @@
-import { JLPTLevel, Prisma, PrismaClient, ReviewStatus } from '@prisma/client';
+import {
+  GrammarExample,
+  JLPTLevel,
+  Prisma,
+  PrismaClient,
+  ReviewStatus,
+} from '@prisma/client';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   JLPT_LEVELS,
   JLPT_LEVEL_LABEL,
@@ -72,7 +79,9 @@ function normalizeText(value: string): string {
   return value.normalize('NFC').trim();
 }
 
-function normalizeOptionalText(value: string | undefined | null): string | undefined {
+function normalizeOptionalText(
+  value: string | undefined | null,
+): string | undefined {
   if (value == null) return undefined;
   const normalized = String(value).normalize('NFC').trim();
   return normalized.length === 0 ? undefined : normalized;
@@ -88,9 +97,13 @@ export function loadSeedGrammar(level: JlptLevelDir): SeedGrammarRecord[] {
     console.log(`  [Fonte] data/validated/grammar/${level}.json`);
   } else if (fs.existsSync(seedPath)) {
     chosenPath = seedPath;
-    console.log(`  [Fonte] seed/grammar/${level}.json (fallback — valide com FASE 28)`);
+    console.log(
+      `  [Fonte] seed/grammar/${level}.json (fallback — valide com FASE 28)`,
+    );
   } else {
-    console.log(`  [WARN] Nenhum arquivo encontrado para ${JLPT_LEVEL_LABEL[level]}`);
+    console.log(
+      `  [WARN] Nenhum arquivo encontrado para ${JLPT_LEVEL_LABEL[level]}`,
+    );
     return [];
   }
 
@@ -103,7 +116,7 @@ export function loadSeedGrammar(level: JlptLevelDir): SeedGrammarRecord[] {
   }
 }
 
-function buildGrammarPointUpsertData(
+export function buildGrammarPointUpsertData(
   record: SeedGrammarRecord,
 ): Prisma.GrammarPointUncheckedCreateInput {
   const pattern = normalizeText(record.pattern);
@@ -129,9 +142,32 @@ function buildGrammarPointUpsertData(
     reviewedAt: record.validationMetadata?.validatedAt
       ? new Date(record.validationMetadata.validatedAt)
       : new Date(),
-    enrichmentData: (record.enrichmentData ?? record.enrichmentMetadata) as Prisma.InputJsonValue | undefined,
-    patternFurigana: record.patternFurigana as Prisma.InputJsonValue | undefined,
-    patternKanjiBreakdown: record.patternKanjiBreakdown as Prisma.InputJsonValue | undefined,
+    enrichmentData: (record.enrichmentData ?? record.enrichmentMetadata) as
+      | Prisma.InputJsonValue
+      | undefined,
+    patternFurigana: record.patternFurigana as
+      | Prisma.InputJsonValue
+      | undefined,
+    patternKanjiBreakdown: record.patternKanjiBreakdown as
+      | Prisma.InputJsonValue
+      | undefined,
+  };
+}
+
+export function buildGrammarPointSeedUpdateData(
+  record: SeedGrammarRecord,
+  point: Prisma.GrammarPointUncheckedCreateInput,
+): Prisma.GrammarPointUncheckedUpdateInput {
+  const { reviewStatus: _status, reviewedAt: _reviewedAt, ...content } = point;
+  return {
+    ...content,
+    title: normalizeOptionalText(record.title) ? point.title : undefined,
+    shortExplanation: normalizeOptionalText(record.shortExplanation)
+      ? point.shortExplanation
+      : undefined,
+    formalityLevel: record.formalityLevel ? point.formalityLevel : undefined,
+    difficulty: record.difficulty === undefined ? undefined : point.difficulty,
+    tags: Array.isArray(record.tags) ? point.tags : undefined,
   };
 }
 
@@ -144,8 +180,18 @@ async function syncGrammarExamples(
 
   if (examples.length === 0) return;
 
-  const normalizedExamples = examples.map((ex, position) => ({
-    grammarPointId,
+  await tx.grammarExample.createMany({
+    data: buildGrammarExampleData(examples).map((example) => ({
+      ...example,
+      grammarPointId,
+    })),
+  });
+}
+
+export function buildGrammarExampleData(
+  examples: SeedGrammarExample[],
+): Omit<Prisma.GrammarExampleCreateManyInput, 'grammarPointId'>[] {
+  return examples.map((ex, position) => ({
     japanese: normalizeText(ex.japanese),
     reading: normalizeOptionalText(ex.reading),
     translation: normalizeText(ex.translation || ''),
@@ -157,27 +203,52 @@ async function syncGrammarExamples(
     characterCount: ex.characterCount,
     wordCount: ex.wordCount,
   }));
+}
 
-  await tx.grammarExample.createMany({ data: normalizedExamples });
+export function grammarExamplesMatch(
+  existing: GrammarExample[],
+  desired: ReturnType<typeof buildGrammarExampleData>,
+): boolean {
+  const ordered = desired
+    .slice()
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  return (
+    existing.length === ordered.length &&
+    ordered.every((example, index) =>
+      Object.entries(example).every(([key, value]) =>
+        isDeepStrictEqual(
+          existing[index][key as keyof GrammarExample],
+          value ?? null,
+        ),
+      ),
+    )
+  );
 }
 
 async function seedGrammarRecord(
   tx: Prisma.TransactionClient,
   record: SeedGrammarRecord,
 ): Promise<'created' | 'updated'> {
+  if (!Array.isArray(record.examples)) {
+    throw new Error('Examples must be an array');
+  }
   const data = buildGrammarPointUpsertData(record);
 
   const existing = await tx.grammarPoint.findFirst({
-    where: { sourceId: data.sourceId as string } as Prisma.GrammarPointWhereInput,
+    where: {
+      sourceId: data.sourceId as string,
+    } as Prisma.GrammarPointWhereInput,
+    include: { examples: { orderBy: [{ position: 'asc' }, { id: 'asc' }] } },
   });
 
   let grammarPoint;
   let action: 'created' | 'updated';
 
   if (existing) {
+    // Keep the editorial decision in the database when reimporting a source.
     grammarPoint = await tx.grammarPoint.update({
       where: { id: existing.id },
-      data,
+      data: buildGrammarPointSeedUpdateData(record, data),
     });
     action = 'updated';
   } else {
@@ -185,7 +256,15 @@ async function seedGrammarRecord(
     action = 'created';
   }
 
-  await syncGrammarExamples(tx, grammarPoint.id, record.examples);
+  if (
+    record.examples.length > 0 &&
+    !grammarExamplesMatch(
+      existing?.examples ?? [],
+      buildGrammarExampleData(record.examples),
+    )
+  ) {
+    await syncGrammarExamples(tx, grammarPoint.id, record.examples);
+  }
   return action;
 }
 
@@ -243,7 +322,11 @@ async function seedLevelInternal(
       created += counts.cCreated;
       updated += counts.cUpdated;
     } catch (error) {
-      const prismaError = error as { code?: string; message?: string; meta?: unknown };
+      const prismaError = error as {
+        code?: string;
+        message?: string;
+        meta?: unknown;
+      };
       if (prismaError.code === 'P2002') {
         console.warn(
           `  [WARN] Chunk ${c + 1}/${chunks.length}: Restrição única (P2002) detectada. ` +
@@ -255,7 +338,10 @@ async function seedLevelInternal(
               await seedGrammarRecord(tx, record);
             });
           } catch (innerError) {
-            const innerPrisma = innerError as { code?: string; message?: string };
+            const innerPrisma = innerError as {
+              code?: string;
+              message?: string;
+            };
             if (innerPrisma.code === 'P2002') {
               console.warn(
                 `    [SKIP] ${record.id ?? '(sem id)'}: Registro duplicado já persistido`,
