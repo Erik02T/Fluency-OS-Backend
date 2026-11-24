@@ -19,6 +19,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JLPTLevel } from '@prisma/client';
+import { ApiProgressBody } from '../../common/dto/api-progress-body';
 import * as AuthRequest from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GrammarService } from './grammar.service';
@@ -38,11 +39,20 @@ export class GrammarController {
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Listar pontos gramaticais com filtros e paginação',
+    security: [{ 'access-token': [] }, {}],
+    summary: 'Listar pontos gramaticais publicados com filtros e paginação',
+    description:
+      'Inclui progresso quando houver uma sessão válida e registro para o item.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'perPage', required: false, type: Number, example: 20 })
   @ApiQuery({ name: 'jlpt', required: false, enum: JLPTLevel })
+  @ApiQuery({
+    name: 'difficulty',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 5 },
+  })
+  @ApiQuery({ name: 'tag', required: false, type: String })
   @ApiQuery({
     name: 'search',
     required: false,
@@ -69,8 +79,8 @@ export class GrammarController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth('access-token')
   @ApiOperation({
+    security: [{ 'access-token': [] }, {}],
     summary: 'Obter detalhe completo de um ponto gramatical',
   })
   @ApiParam({
@@ -99,8 +109,11 @@ export class GrammarController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
+  @ApiProgressBody(UpdateGrammarProgressDto, ['understood', 'confidenceLevel'])
   @ApiOperation({
     summary: 'Marcar ponto gramatical como estudado ou revisado',
+    description:
+      'study registra estudo. review exige understood e confidenceLevel entre 0 e 5. Apenas pontos publicados aceitam progresso.',
   })
   @ApiParam({
     name: 'id',
@@ -112,6 +125,10 @@ export class GrammarController {
     status: 200,
     description: 'Progresso atualizado com sucesso',
     type: GrammarProgressResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Payload inválido para a ação informada',
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({

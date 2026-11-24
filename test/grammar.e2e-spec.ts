@@ -160,6 +160,7 @@ describe('Grammar E2E', () => {
       data: {
         pattern: `〜ている-${uniqueSuffix}`,
         jlptLevel: 'N5',
+        reviewStatus: 'PUBLISHED',
         title: `Ação contínua ${uniqueSuffix}`,
         shortExplanation: 'Indica ação em progresso ou estado contínuo',
         detailedExplanation:
@@ -373,17 +374,53 @@ describe('Grammar E2E', () => {
       expect(persisted?.examples).toHaveLength(2);
     });
 
-    it('reflete ponto admin criado na listagem pública', async () => {
-      const response = await request(app.getHttpServer())
-        .get(
-          `/grammar?search=${encodeURIComponent(`admin-${uniqueSuffix}`)}&page=1&perPage=20`,
-        )
-        .expect(200);
+    it('oculta o rascunho e exibe progresso somente enquanto publicado', async () => {
+      const search = () =>
+        request(app.getHttpServer())
+          .get(
+            `/grammar?search=${encodeURIComponent(`admin-${uniqueSuffix}`)}&page=1&perPage=20`,
+          )
+          .expect(200);
+      const status = (reviewStatus: string) =>
+        request(app.getHttpServer())
+          .patch(`/admin/grammar-points/${adminCreatedId}/status`)
+          .set('Authorization', `Bearer ${adminAccessToken}`)
+          .send({ reviewStatus })
+          .expect(200);
+      const progress = () =>
+        request(app.getHttpServer())
+          .post(`/grammar/${adminCreatedId}/progress`)
+          .set('Authorization', `Bearer ${accessToken}`)
+          .send({ action: 'study' });
+      for (const hidden of ['PENDING', 'GENERATED', 'VALIDATED', 'REVIEWED']) {
+        await status(hidden);
+        const response = await search();
+        assertPaginatedBody<{ id: string }>(response.body);
+        expect(response.body.pagination.total).toBe(0);
+        await request(app.getHttpServer())
+          .get(`/grammar/${adminCreatedId}`)
+          .expect(404);
+        await progress().expect(404);
+      }
 
+      await request(app.getHttpServer())
+        .get(`/admin/grammar-points/${adminCreatedId}`)
+        .set('Authorization', `Bearer ${adminAccessToken}`)
+        .expect(200);
+      await status('PUBLISHED');
+      const response = await search();
       assertPaginatedBody<{ id: string }>(response.body);
-      expect(
-        response.body.data.some((item) => item.id === adminCreatedId),
-      ).toBe(true);
+      expect(response.body.data.map(({ id }) => id)).toEqual([adminCreatedId]);
+      expect(response.body.pagination.total).toBe(1);
+      await progress().expect(200);
+      await status('REVIEWED');
+      await progress().expect(404);
+      await status('PUBLISHED');
+      const detail = await request(app.getHttpServer())
+        .get(`/grammar/${adminCreatedId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+      expect(detail.body).toMatchObject({ userProgress: { isStudied: true } });
     });
 
     it('nega acesso admin sem autenticação', async () => {

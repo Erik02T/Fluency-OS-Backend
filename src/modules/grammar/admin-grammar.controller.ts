@@ -104,7 +104,7 @@ export class AdminGrammarController {
         filters,
       },
     );
-    return this.grammarService.findAll(filters);
+    return this.grammarService.findAll(filters, undefined, true);
   }
 
   @Get(':id')
@@ -130,7 +130,7 @@ export class AdminGrammarController {
         grammarPointId: id,
       },
     );
-    return this.grammarService.findById(id);
+    return this.grammarService.findById(id, undefined, true);
   }
 
   @Post()

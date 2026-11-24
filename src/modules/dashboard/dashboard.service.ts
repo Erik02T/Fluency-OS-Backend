@@ -101,7 +101,11 @@ export class DashboardSummaryService {
         select: { lastReviewAt: true },
       }),
       this.prisma.userGrammarProgress.count({
-        where: { userId, isStudied: true },
+        where: {
+          userId,
+          isStudied: true,
+          grammarPoint: { reviewStatus: 'PUBLISHED' },
+        },
       }),
       this.prisma.streak.findUnique({
         where: { userId },

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ReviewStatus } from '@prisma/client';
 import {
   CreateGrammarPointDto,
   UpdateGrammarProgressDto,
@@ -36,10 +36,14 @@ export class GrammarService {
   async findAll(
     filters: GrammarFiltersDto,
     userId?: string,
+    admin = false,
   ): Promise<PaginatedGrammarResponseDto> {
+    const visible = admin
+      ? filters
+      : { ...filters, status: ReviewStatus.PUBLISHED };
     const [items, total] = await Promise.all([
-      this.grammarRepository.findAll(filters),
-      this.grammarRepository.count(filters),
+      this.grammarRepository.findAll(visible),
+      this.grammarRepository.count(visible),
     ]);
 
     let progressMap = new Map<string, UserGrammarProgressEntity>();
@@ -67,8 +71,12 @@ export class GrammarService {
   async findById(
     id: string,
     userId?: string,
+    admin = false,
   ): Promise<GrammarDetailResponseDto> {
-    const grammarPoint = await this.grammarRepository.findByIdFull(id);
+    const grammarPoint = await this.grammarRepository.findByIdFull(
+      id,
+      admin ? undefined : ReviewStatus.PUBLISHED,
+    );
 
     if (!grammarPoint) {
       throw new NotFoundException(`Grammar point with id ${id} not found`);
@@ -213,47 +221,38 @@ export class GrammarService {
     grammarPointId: string,
     dto: UpdateGrammarProgressDto,
   ): Promise<GrammarProgressResponseDto> {
-    const grammarPoint =
-      await this.grammarRepository.findByIdFull(grammarPointId);
-
-    if (!grammarPoint) {
+    const progress =
+      await this.userGrammarProgressRepository.withPublishedPoint(
+        grammarPointId,
+        async (tx) => {
+          const existing =
+            (await this.userGrammarProgressRepository.findByUserAndGrammarPoint(
+              userId,
+              grammarPointId,
+              tx,
+            )) ??
+            (await this.userGrammarProgressRepository.create(
+              userId,
+              grammarPointId,
+              tx,
+            ));
+          if (dto.action === 'study') {
+            return existing;
+          }
+          return this.userGrammarProgressRepository.update(
+            userId,
+            grammarPointId,
+            this.buildReviewUpdate(existing, dto),
+            tx,
+          );
+        },
+      );
+    if (!progress) {
       throw new NotFoundException(
         `Grammar point with id ${grammarPointId} not found`,
       );
     }
-
-    let progress =
-      await this.userGrammarProgressRepository.findByUserAndGrammarPoint(
-        userId,
-        grammarPointId,
-      );
-
-    if (dto.action === 'study') {
-      if (!progress) {
-        progress = await this.userGrammarProgressRepository.create(
-          userId,
-          grammarPointId,
-        );
-      }
-
-      return this.toProgressDto(grammarPointId, progress);
-    }
-
-    if (!progress) {
-      progress = await this.userGrammarProgressRepository.create(
-        userId,
-        grammarPointId,
-      );
-    }
-
-    const updateData = this.buildReviewUpdate(progress, dto);
-    const updated = await this.userGrammarProgressRepository.update(
-      userId,
-      grammarPointId,
-      updateData,
-    );
-
-    return this.toProgressDto(grammarPointId, updated);
+    return this.toProgressDto(grammarPointId, progress);
   }
 
   private toListDto(
