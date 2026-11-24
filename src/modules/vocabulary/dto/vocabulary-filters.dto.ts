@@ -16,6 +16,10 @@ export class VocabularyFiltersDto {
   )
   search?: string;
 
+  @IsOptional()
+  @IsIn(['true'])
+  studied?: 'true';
+
   @Type(() => Number)
   @Min(1)
   page: number = 1;
