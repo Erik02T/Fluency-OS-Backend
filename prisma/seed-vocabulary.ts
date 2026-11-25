@@ -1,14 +1,10 @@
 import { Prisma, PrismaClient, JLPTLevel } from '@prisma/client';
-import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { reportSeedError, runSnapshotSeed } from './catalog-snapshot/cli';
 import {
   loadSeedVocabulary,
   type ImportSummary,
   type VocabularyPrismaData,
-  type PipelineResult,
 } from '../src/modules/vocabulary/seed';
-
-const prisma = new PrismaClient();
 
 const CHUNK_SIZE = 200;
 
@@ -18,7 +14,7 @@ function wordReadingKey(word: string, reading: string): WordReadingKey {
   return `${word}\x00${reading}`;
 }
 
-async function collectExistingKeys(): Promise<{
+async function collectExistingKeys(prisma: PrismaClient): Promise<{
   existingSet: Set<WordReadingKey>;
   existingMap: Map<WordReadingKey, string>;
 }> {
@@ -144,7 +140,7 @@ async function insertChunk(
   return { inserted, updated, meaningsInserted, examplesInserted };
 }
 
-async function main(): Promise<void> {
+async function seedRawJmdict(prisma: PrismaClient): Promise<void> {
   console.log('='.repeat(72));
   console.log('Vocabulary Seed Pipeline — JMdict import');
   console.log('='.repeat(72));
@@ -152,26 +148,7 @@ async function main(): Promise<void> {
   console.log(
     '\n[1/4] Parsing JMdict JSON and running transformation pipeline...',
   );
-  let pipeline: PipelineResult;
-  try {
-    if (process.argv.includes('--release')) {
-      const seedDir = join(__dirname, 'seed', 'vocabulary');
-      const release = JSON.parse(
-        readFileSync(join(seedDir, 'jmdict-release.json'), 'utf8'),
-      ) as { jsonFile: string; jsonSha256: string };
-      pipeline = loadSeedVocabulary({
-        datasetPath: join(seedDir, 'raw', release.jsonFile),
-        datasetSha256: release.jsonSha256,
-      });
-    } else {
-      pipeline = loadSeedVocabulary();
-    }
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-
-  const { prismaData, stats } = pipeline;
+  const { prismaData, stats } = loadSeedVocabulary();
 
   console.log(
     `  • JMdict entries:             ${stats.totalJmdictEntries.toLocaleString('pt-BR')}`,
@@ -201,7 +178,7 @@ async function main(): Promise<void> {
   console.log(
     '\n[2/4] Fetching existing vocabulary keys from DB for idempotency...',
   );
-  const { existingSet } = await collectExistingKeys();
+  const { existingSet } = await collectExistingKeys(prisma);
   console.log(
     `  • Existing vocabulary rows:   ${existingSet.size.toLocaleString('pt-BR')}`,
   );
@@ -303,6 +280,7 @@ async function main(): Promise<void> {
   console.log(`    N1:        ${jlptDist.N1.toLocaleString('pt-BR')}`);
   console.log(`    UNKNOWN:   ${jlptDist.UNKNOWN.toLocaleString('pt-BR')}`);
   if (errorsLogged.length > 0) {
+    process.exitCode = 1;
     console.log(`\n  ⚠  Errors logged (${errorsLogged.length} chunks):`);
     for (const err of errorsLogged.slice(0, 5)) {
       console.log(`    - ${err}`);
@@ -310,17 +288,24 @@ async function main(): Promise<void> {
     if (errorsLogged.length > 5) {
       console.log(`    ... and ${errorsLogged.length - 5} more.`);
     }
+    return;
   }
 
   console.log('\n✅ Seed completed successfully.');
 }
 
-main()
-  .catch((error) => {
-    console.error('\n❌ Fatal error during vocabulary seed:');
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.length === 1 && args[0] === '--raw-jmdict') {
+    const prisma = new PrismaClient();
+    void seedRawJmdict(prisma)
+      .finally(() => prisma.$disconnect())
+      .catch(reportSeedError);
+  } else if (!args.length || (args.length === 1 && args[0] === '--release')) {
+    void runSnapshotSeed('vocabulary').catch(reportSeedError);
+  } else {
+    reportSeedError(
+      new Error('Usage: db:seed:vocabulary [--release | --raw-jmdict]'),
+    );
+  }
+}
