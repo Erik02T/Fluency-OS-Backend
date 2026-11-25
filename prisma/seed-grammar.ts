@@ -87,7 +87,34 @@ function normalizeOptionalText(
   return normalized.length === 0 ? undefined : normalized;
 }
 
-export function loadSeedGrammar(level: JlptLevelDir): SeedGrammarRecord[] {
+export function loadSeedGrammar(
+  level: JlptLevelDir,
+  useVersionedSeed = false,
+): SeedGrammarRecord[] {
+  if (useVersionedSeed) {
+    const content = fs.readFileSync(seedGrammarFile(level), 'utf8');
+    const records = JSON.parse(content) as SeedGrammarRecord[];
+    if (!Array.isArray(records)) {
+      throw new Error('The MVP grammar seed must be an array');
+    }
+    const sourceIds = new Set(
+      records.map((record) =>
+        normalizeOptionalText(record.sourceId ?? record.id),
+      ),
+    );
+    if (
+      records.length !== 40 ||
+      sourceIds.has(undefined) ||
+      sourceIds.size !== 40 ||
+      records.some((record) => record.jlpt !== 'N5' || !record.examples?.length)
+    ) {
+      throw new Error(
+        'The MVP grammar seed must contain 40 N5 points with distinct source IDs and examples',
+      );
+    }
+    return records;
+  }
+
   const validatedPath = validatedGrammarFile(level);
   const seedPath = seedGrammarFile(level);
 
@@ -279,9 +306,10 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 async function seedLevelInternal(
   prisma: PrismaClient,
   level: JlptLevelDir,
+  useVersionedSeed: boolean,
 ): Promise<SeedLevelResult> {
   console.log(`\n[${JLPT_LEVEL_LABEL[level]}] Carregando registros...`);
-  const records = loadSeedGrammar(level);
+  const records = loadSeedGrammar(level, useVersionedSeed);
   if (records.length === 0) {
     console.log(`  Nenhum registro para processar`);
     return { level, created: 0, updated: 0, failed: 0, loaded: 0 };
@@ -379,9 +407,11 @@ async function seedLevelInternal(
 
 export async function seedGrammar(
   prisma: PrismaClient,
-  options: { levels?: JlptLevelDir[]; quiet?: boolean } = {},
+  options: { levels?: JlptLevelDir[]; quiet?: boolean; release?: boolean } = {},
 ): Promise<SeedGrammarResult> {
-  const levels = options.levels ?? JLPT_LEVELS;
+  const levels = options.release
+    ? (['n5'] as const)
+    : (options.levels ?? JLPT_LEVELS);
   const byLevel: SeedLevelResult[] = [];
 
   if (!options.quiet) {
@@ -394,7 +424,11 @@ export async function seedGrammar(
   }
 
   for (const level of levels) {
-    const result = await seedLevelInternal(prisma, level);
+    const result = await seedLevelInternal(
+      prisma,
+      level,
+      options.release ?? false,
+    );
     byLevel.push(result);
   }
 
@@ -429,7 +463,10 @@ export async function seedGrammar(
 
 if (require.main === module) {
   const prisma = new PrismaClient();
-  seedGrammar(prisma)
+  seedGrammar(prisma, { release: process.argv.includes('--release') })
+    .then(({ totals }) => {
+      if (totals.failed > 0) process.exitCode = 1;
+    })
     .catch((error) => {
       console.error('Erro no seed de gramática:', error);
       process.exit(1);

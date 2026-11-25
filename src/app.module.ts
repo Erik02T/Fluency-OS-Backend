@@ -1,4 +1,5 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +17,15 @@ import { CommonModule } from './common/common.module';
 import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 import { RequestObservabilityMiddleware } from './common/middleware/request-observability.middleware';
 import { validateEnv } from './config/validation.schema';
+
+function disableSharedCaching(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  res.setHeader('Cache-Control', 'private, no-store');
+  next();
+}
 
 @Module({
   imports: [
@@ -43,7 +53,11 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // Aplicar rate limiting a todas as rotas exceto health check
     consumer
-      .apply(RequestObservabilityMiddleware, RateLimitMiddleware)
+      .apply(
+        disableSharedCaching,
+        RequestObservabilityMiddleware,
+        RateLimitMiddleware,
+      )
       .forRoutes('*');
   }
 }

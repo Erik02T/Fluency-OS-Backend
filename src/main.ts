@@ -1,31 +1,14 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  parseFrontendOrigins,
+  parseTrustedProxies,
+} from './config/validation.schema';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  const allowedOrigins = process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())
-    : ['http://localhost:3000'];
-
-  app.enableCors({
-    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
-    credentials: true,
-    exposedHeaders: ['Retry-After'],
-  });
-
-  // Adicionar validação automática de DTO
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  // Configurar Swagger
+function configureSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('Fluency OS — Backend API')
     .setDescription(
@@ -53,10 +36,43 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
+}
 
-  const port = process.env.APP_PORT || 3001;
-  await app.listen(port);
-  console.log(`🚀 Server running on http://localhost:${port}`);
-  console.log(`📚 Swagger docs available at http://localhost:${port}/docs`);
+async function bootstrap() {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const production = process.env.NODE_ENV === 'production';
+  const trustedProxies = parseTrustedProxies(process.env.TRUST_PROXY);
+  if (trustedProxies.length) {
+    app.set('trust proxy', trustedProxies);
+  }
+
+  const allowedOrigins =
+    process.env.FRONTEND_URL === undefined && !production
+      ? ['http://localhost:3000']
+      : parseFrontendOrigins(process.env.FRONTEND_URL);
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+    exposedHeaders: ['Retry-After'],
+  });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  const swaggerEnabled =
+    process.env.SWAGGER_ENABLED === undefined
+      ? !production
+      : process.env.SWAGGER_ENABLED === 'true';
+  if (swaggerEnabled) configureSwagger(app);
+
+  const port = Number(process.env.APP_PORT || process.env.PORT || 3001);
+  await app.listen(port, '0.0.0.0');
+  console.log('API listening on port ' + port);
+  if (swaggerEnabled) console.log('Swagger is available at /docs');
 }
 void bootstrap();

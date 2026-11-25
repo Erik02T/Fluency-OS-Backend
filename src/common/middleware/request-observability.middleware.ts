@@ -24,7 +24,7 @@ export class RequestObservabilityMiddleware implements NestMiddleware {
         logStructured('info', 'HttpRequest', 'request.completed', {
           requestId,
           method: req.method,
-          path: req.originalUrl,
+          path: req.originalUrl.split('?', 1)[0],
           statusCode: res.statusCode,
           durationMs,
         });
