@@ -1,4 +1,6 @@
 import { Prisma, PrismaClient, JLPTLevel } from '@prisma/client';
+import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import {
   loadSeedVocabulary,
   type ImportSummary,
@@ -152,7 +154,18 @@ async function main(): Promise<void> {
   );
   let pipeline: PipelineResult;
   try {
-    pipeline = loadSeedVocabulary();
+    if (process.argv.includes('--release')) {
+      const seedDir = join(__dirname, 'seed', 'vocabulary');
+      const release = JSON.parse(
+        readFileSync(join(seedDir, 'jmdict-release.json'), 'utf8'),
+      ) as { jsonFile: string; jsonSha256: string };
+      pipeline = loadSeedVocabulary({
+        datasetPath: join(seedDir, 'raw', release.jsonFile),
+        datasetSha256: release.jsonSha256,
+      });
+    } else {
+      pipeline = loadSeedVocabulary();
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

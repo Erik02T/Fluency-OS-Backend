@@ -37,17 +37,17 @@ export class RateLimitMiddleware implements NestMiddleware {
     const area = req.originalUrl.split('?')[0].split('/')[1]?.toLowerCase();
     if (req.method === 'OPTIONS' || area === 'health') return next();
 
-    if (process.env.NODE_ENV === 'test' || process.env.CI === 'true') {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      (process.env.NODE_ENV !== 'production' && process.env.CI === 'true')
+    ) {
       res.setHeader('X-RateLimit-Limit', 'unlimited');
       res.setHeader('X-RateLimit-Remaining', 'unlimited');
       res.setHeader('X-RateLimit-Reset', '0');
       return next();
     }
 
-    const clientIp =
-      req.header('x-forwarded-for')?.split(',')[0].trim() ||
-      req.ip ||
-      'unknown';
+    const clientIp = req.ip ?? req.socket.remoteAddress ?? 'unknown';
     const scope = area === 'auth' || API_AREAS.has(area) ? area : 'other';
     const limit = scope === 'auth' ? AUTH_LIMIT : this.maxRequests;
 

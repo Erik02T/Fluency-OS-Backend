@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { JMdict } from '@scriptin/jmdict-simplified-types';
 import { parseJmdictDictionary } from './vocabulary-parser';
@@ -18,6 +19,7 @@ export { DEFAULT_IMPORT_LIMIT };
 
 export type LoadSeedVocabularyOptions = {
   datasetPath?: string;
+  datasetSha256?: string;
   limit?: number;
 };
 
@@ -42,7 +44,7 @@ export function loadSeedVocabulary(
   const datasetPath = resolveDatasetPath(options.datasetPath);
   const limit = options.limit ?? 8000;
 
-  const jmdict = loadJmdict(datasetPath);
+  const jmdict = loadJmdict(datasetPath, options.datasetSha256);
   const totalJmdictEntries = jmdict.words.length;
 
   const raw = parseJmdictDictionary(jmdict);
@@ -139,9 +141,15 @@ function resolveDatasetPath(customPath?: string): string {
   );
 }
 
-function loadJmdict(path: string): JMdict {
-  const raw = readFileSync(path, 'utf8');
-  const parsed = JSON.parse(raw) as JMdict & {
+function loadJmdict(path: string, expectedSha256?: string): JMdict {
+  const raw = readFileSync(path);
+  if (
+    expectedSha256 &&
+    createHash('sha256').update(raw).digest('hex') !== expectedSha256
+  ) {
+    throw new Error('[vocabulary-seed] JMdict SHA-256 mismatch');
+  }
+  const parsed = JSON.parse(raw.toString('utf8')) as JMdict & {
     words?: unknown[];
     dictDate?: unknown;
   };

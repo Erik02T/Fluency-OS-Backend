@@ -5,7 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import { isIP } from 'node:net';
+import Redis, { type RedisOptions } from 'ioredis';
 
 /**
  * RedisService
@@ -26,23 +27,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async onModuleInit() {
     try {
-      this.client = new Redis({
-        host: this.configService.get('REDIS_HOST') || 'localhost',
-        port: this.configService.get('REDIS_PORT') || 6379,
-        db: 0,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
-      });
+      const url = this.configService.get<string>('REDIS_URL');
+      const options: RedisOptions = {
+        connectTimeout: 3000,
+        commandTimeout: 3000,
+        maxRetriesPerRequest: 1,
+        autoResendUnfulfilledCommands: false,
+        retryStrategy: (times) => Math.min(times * 50, 2000),
+      };
+      if (url?.startsWith('rediss:')) {
+        const hostname = new URL(url).hostname.replace(/^\[|\]$/g, '');
+        options.tls = {
+          rejectUnauthorized: true,
+          ...(!isIP(hostname) && { servername: hostname }),
+        };
+      }
+      this.client = url
+        ? new Redis(url, options)
+        : new Redis({
+            ...options,
+            host: this.configService.get<string>('REDIS_HOST') || 'localhost',
+            port: Number(
+              this.configService.get<string>('REDIS_PORT') || '6379',
+            ),
+          });
+      // A resposta do Redis pode incluir argumentos de sessão em erros de comando.
+      this.client.on('error', () => undefined);
 
       // Aguardar conexão
       await this.client.ping();
       this.logger.log('Redis connected successfully');
-    } catch (error) {
-      this.logger.error(
-        `Failed to connect to Redis: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      this.logger.error('Failed to connect to Redis during startup');
       // Não interrompe o bootstrap da API: readiness reportará degradação (503).
     }
   }

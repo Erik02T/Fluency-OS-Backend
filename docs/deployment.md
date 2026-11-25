@@ -1,6 +1,6 @@
 # Deployment — Estado Atual
 
-**Última verificação:** 2026-09-11
+**Registro de 2026-09-11.** A [configuração de produção atual](production.md) descreve runtime, proxy, banco e carga inicial.
 
 ## Infraestrutura comprovada
 
