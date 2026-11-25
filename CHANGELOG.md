@@ -17,6 +17,7 @@ O formato segue o padrão **Keep a Changelog** e utiliza **Semantic Versioning (
 
 ### Added
 
+- Snapshots versionados dos catálogos de Vocabulário e Gramática, com exportação somente leitura, manifesto SHA-256 e carga transacional.
 - Estrutura inicial da documentação (`docs/`)
 - Planejamento de CI/CD
 - Roadmap do projeto

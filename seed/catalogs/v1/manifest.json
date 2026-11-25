@@ -1,0 +1,189 @@
+{
+  "formatVersion": 1,
+  "datasetVersion": "1.0.0",
+  "sources": {
+    "vocabulary": [
+      {
+        "name": "JMdict (Electronic Dictionary Research and Development Group)",
+        "url": "https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project",
+        "licenseUrl": "https://www.edrdg.org/edrdg/licence.html",
+        "attribution": "The vocabulary data in this application is derived from the JMdict dictionary file, which was compiled by the Electronic Dictionary Research and Development Group (EDRDG), and is used in conformance with the Group’s licence. See https://www.edrdg.org/ for more information."
+      },
+      {
+        "name": "jmdict-simplified",
+        "url": "https://github.com/scriptin/jmdict-simplified",
+        "attribution": "JSON intermediario do JMdict, convertido em catálogo com seleção de pares de palavra e leitura e significados em inglês."
+      }
+    ],
+    "grammar": [
+      {
+        "name": "Jonathan Waller (Tanos JLPT Grammar Lists)",
+        "url": "https://www.tanos.co.uk/jlpt/skills/grammar/",
+        "licenseUrl": "https://www.tanos.co.uk/jlpt/sharing/",
+        "attribution": "Listas de padrões JLPT de Jonathan Waller (Tanos), selecionadas e ordenadas no catálogo local."
+      },
+      {
+        "name": "Tatoeba",
+        "url": "https://tatoeba.org/en/downloads",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+        "attribution": "Frases japonesas do corpus Tatoeba selecionadas pelo pipeline de Gramática para N1 a N4."
+      },
+      {
+        "name": "Fluency OS",
+        "url": "https://github.com/Erik02T/Fluency-OS-Backend",
+        "attribution": "Exemplos didáticos N5, com leituras e traduções, do seed de Gramática do Fluency OS."
+      }
+    ]
+  },
+  "files": [
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-001.json",
+      "sha256": "96085ce1ac4f5318e96065a8d052580b1e7f7c9596b2359fd6ded8f456feb5df",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-002.json",
+      "sha256": "faa8ad3c24717cf54a1b5e9e766fe37203cff0b3d1ca7052d96aa6074eeb348e",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-003.json",
+      "sha256": "aa1c8e3599382a79197d54655608646ab9954a31335a9438b49b5308067c2e97",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-004.json",
+      "sha256": "fc992f0c7342b11a940d5f2cbf1cbf7d3cba86df0dc7a33462c0586dfd30fdb2",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-005.json",
+      "sha256": "8296dce6fea7823a084f635caf4cb62a6f4bde61fb355f92b671defd4dcf067c",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-006.json",
+      "sha256": "3f5e05489a29904aaa116ca4e1532d1eda09a71dea33b92b86c73cbb4e936c34",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-007.json",
+      "sha256": "d26f0134ca07b9c566990fc4911561f2f04ba8d64ab3f7a59e895c4e0f746873",
+      "records": 1000
+    },
+    {
+      "catalog": "vocabulary",
+      "path": "vocabulary-008.json",
+      "sha256": "60cfbfbb8b6608054ecbad74e9311deba4d3a286b69e956dc89c3c0cf20c92e7",
+      "records": 1000
+    },
+    {
+      "catalog": "grammar",
+      "path": "grammar-001.json",
+      "sha256": "9458f5c1ec5bdea8c9113b20ecfa5ffc45fe9b73594299dc0f2a1d0a71fcb6b4",
+      "records": 40
+    },
+    {
+      "catalog": "grammar",
+      "path": "grammar-002.json",
+      "sha256": "6e13e1c67f887731355d987a2211c1691cf4733cb242b19ef674be341916f7ea",
+      "records": 50
+    },
+    {
+      "catalog": "grammar",
+      "path": "grammar-003.json",
+      "sha256": "4df1ba4fd6f9bb69387728f01907ef16303919c917da1f1882604d4acbf89585",
+      "records": 63
+    },
+    {
+      "catalog": "grammar",
+      "path": "grammar-004.json",
+      "sha256": "587b3210094117977fff1396cd3a3efafeed7d089cacdf9d6c6f4aa492121210",
+      "records": 63
+    },
+    {
+      "catalog": "grammar",
+      "path": "grammar-005.json",
+      "sha256": "e3adbfc9ab6cd6306a7d56d9d288c1ed20d49f77b6c82454f1df8b3272a956d1",
+      "records": 70
+    }
+  ],
+  "vocabulary": {
+    "records": 8000,
+    "examples": 0,
+    "meanings": 56958,
+    "byLevel": {
+      "N5": {
+        "records": 0,
+        "examples": 0
+      },
+      "N4": {
+        "records": 0,
+        "examples": 0
+      },
+      "N3": {
+        "records": 0,
+        "examples": 0
+      },
+      "N2": {
+        "records": 0,
+        "examples": 0
+      },
+      "N1": {
+        "records": 0,
+        "examples": 0
+      },
+      "UNKNOWN": {
+        "records": 8000,
+        "examples": 0
+      }
+    }
+  },
+  "grammar": {
+    "records": 286,
+    "examples": 1140,
+    "meanings": 0,
+    "byLevel": {
+      "N5": {
+        "records": 40,
+        "examples": 40
+      },
+      "N4": {
+        "records": 50,
+        "examples": 245
+      },
+      "N3": {
+        "records": 63,
+        "examples": 315
+      },
+      "N2": {
+        "records": 63,
+        "examples": 305
+      },
+      "N1": {
+        "records": 70,
+        "examples": 235
+      },
+      "UNKNOWN": {
+        "records": 0,
+        "examples": 0
+      }
+    },
+    "sourceReviewStatuses": {
+      "PENDING": 0,
+      "GENERATED": 0,
+      "VALIDATED": 0,
+      "REVIEWED": 0,
+      "PUBLISHED": 286
+    },
+    "untranslatedExamples": 1100,
+    "publishViaAdmin": true
+  }
+}

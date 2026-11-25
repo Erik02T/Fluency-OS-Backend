@@ -42,7 +42,7 @@ Use uma instância paga para disponibilidade contínua. Se escolher Free para pi
 ## Neon e migrações
 
 1. Registre projeto, branch do banco, nome, usuário, região, plano, limite de conexões, armazenamento, suspensão e janela de restauração. Verifique se o banco contém dados. Confirme `sslmode=require&sslaccept=strict` tanto na URL pooled quanto na direta. Preserve parâmetros compatíveis do Neon, como `channel_binding` quando aplicável. Teste a primeira conexão e a retomada na versão do Prisma fixada no lockfile. [Neon com Prisma](https://neon.com/docs/guides/prisma) · [Conector PostgreSQL do Prisma v6](https://www.prisma.io/docs/orm/v6/overview/databases/postgresql)
-2. Use a URL **direta** em `DATABASE_URL` apenas no executor de migração. O schema já lê essa variável. Para Web Service pago, injete no ambiente do comando a URL direta guardada em um secret file. Por exemplo, Pre-Deploy Command `DATABASE_URL="$(cat /etc/secrets/neon-direct-url)" npx --no-install prisma migrate deploy`. Sem pre-deploy, o operador roda o mesmo comando de migração por um executor administrativo isolado, com a URL direta no seu gerenciador de segredos. Escolha um executor por versão e mantenha o ambiente da API com a URL pooled.
+2. Use a URL **direta** em `DATABASE_URL` no executor de migração. O schema já lê essa variável. Para Web Service pago, injete no ambiente do comando a URL direta guardada em um secret file. Por exemplo, Pre-Deploy Command `DATABASE_URL="$(cat /etc/secrets/neon-direct-url)" npx --no-install prisma migrate deploy`. Sem pre-deploy, o operador roda o mesmo comando de migração por um executor administrativo isolado, com a URL direta no seu gerenciador de segredos. Escolha um executor por versão e mantenha o ambiente da API com a URL pooled.
 3. Para banco vazio, execute `npx --no-install prisma migrate deploy` e `npx --no-install prisma migrate status`. O candidato contém 17 migrações. Confirme o schema e uma segunda execução sem migrações pendentes. Em atualização, compare `_prisma_migrations` com o histórico da release e teste em cópia representativa antes de reservar a janela sem escritas.
 4. Antes de atualizar, faça backup com a política do plano e ensaie a restauração em outro banco. Exemplo com serviços locais de libpq previamente cadastrados em arquivo privado e TLS verificado.
 
@@ -77,14 +77,74 @@ Em falha do Redis, a prontidão responde 503. Login, registro com sessão, renov
 
 Meça a diferença dos contadores do Upstash durante 15 minutos ociosos e durante uma amostra registrada de login, renovação, navegação, revisão e logout. Anote número de chamadas HTTP, comandos do painel, frequência de readiness, repetições e efeito de `EVAL`, além de latência de reconexão. Estime `comandos mensais ≈ 30 × (comandos automáticos diários + chamadas diárias × comandos medidos por chamada)`. Em ordem de grandeza, 500 mil em 30 dias equivalem a cerca de 16,7 mil comandos por dia. Confirme as operações reais, o TTL, a política de descarte e a margem antes da abertura.
 
-## Conteúdo e primeira conta administrativa
+## Carga dos catálogos e publicação editorial
 
-Use a base direta no executor administrativo, depois das migrações e do aceite para o ambiente.
+O [manifesto 1.0.0](../seed/catalogs/v1/manifest.json) registra os catálogos do PostgreSQL local do Fluency OS, as fontes e os SHA-256. Os arquivos contêm conteúdo de Vocabulário e Gramática com seus IDs, exemplos e metadados editoriais. A exportação usa uma lista explícita de campos e uma transação somente leitura com visão consistente. Datas operacionais de criação e atualização ficam fora do snapshot.
+
+### Exportar e validar
+
+No checkout do backend com as dependências instaladas e o Prisma Client gerado, injete a URL do banco de origem pelo gerenciador de segredos na variável `CATALOG_SOURCE_DATABASE_URL`. Use um usuário com acesso de leitura aos dois catálogos. O diretório de saída deve ser novo. Para preparar outra versão, compare o conteúdo, confira as fontes e atualize os arquivos versionados após a revisão.
+
+```sh
+npm run db:catalogs:export -- 1.0.0 ./data/generated/catalogs-export-1.0.0
+npm run db:catalogs:validate -- ./data/generated/catalogs-export-1.0.0
+npm run db:catalogs:validate
+```
+
+O último comando valida o snapshot versionado. Ele verifica os hashes, a estrutura, a unicidade dos IDs e as contagens do manifesto. O seed repete essas verificações antes de conectar ao destino.
+
+### Executar a carga no Render
+
+Use o artefato do commit aprovado com `seed/catalogs/v1`, Node 22, as dependências do lockfile (incluindo `ts-node`) e o Prisma Client gerado. Confirme `prisma migrate status` no executor da release. Configure a URL **direta** do Neon, sem `-pooler` no hostname, no secret file `neon-direct-url`, com `sslmode=require&sslaccept=strict`. Execute o comando abaixo uma vez a partir da raiz em um executor administrativo, por exemplo um shell efêmero de serviço pago. A atribuição de `DATABASE_URL` vale só para o comando. [Shell efêmero do Render](https://render.com/docs/ssh) · [Secret files no Render](https://render.com/docs/configure-environment-variables) · [Neon com Prisma](https://neon.com/docs/guides/prisma)
+
+```sh
+test -s /etc/secrets/neon-direct-url && DATABASE_URL="$(cat /etc/secrets/neon-direct-url)" npm run db:seed:catalogs
+```
+
+O comando carrega Vocabulário e Gramática em lotes dentro de uma única transação. Durante a transação, as tabelas de conteúdo permitem consultas e bloqueiam outras escritas. Rode em uma janela administrativa sem edições no catálogo. A execução retorna código diferente de zero em caso de erro e reverte as gravações da tentativa. Mantenha a carga como comando administrativo. Para executar fora do Render, injete a mesma URL direta em `DATABASE_URL` por meio do gerenciador de segredos do executor e rode `npm run db:seed:catalogs`.
+
+Os comandos `npm run db:seed:vocabulary` e `npm run db:seed:grammar` carregam os catálogos separadamente. Ambos aceitam `--release` como alias compatível. O importador preserva os registros já existentes, incluindo seus exemplos e decisões editoriais. Ele reconhece Vocabulário pelo ID ou pelo par palavra/leitura e Gramática pelo ID ou pelo par fonte/ID de origem. Compare divergências de conteúdo e contagem em bases já preenchidas. A importação adiciona registros novos com o conjunto completo de filhos da origem.
+
+### Conferir as contagens
+
+Em uma base inicial vazia, compare as contagens com o manifesto.
+
+| Catálogo | Nível | Registros | Significados | Exemplos |
+| --- | --- | ---: | ---: | ---: |
+| Vocabulário | Sem JLPT | 8.000 | 56.958 | 0 |
+| Gramática | N5 | 40 | — | 40 |
+| Gramática | N4 | 50 | — | 245 |
+| Gramática | N3 | 63 | — | 315 |
+| Gramática | N2 | 63 | — | 305 |
+| Gramática | N1 | 70 | — | 235 |
+| Gramática | Total | 286 | — | 1.140 |
+
+```sql
+SELECT "jlptLevel", COUNT(*) FROM vocabulary GROUP BY 1;
+SELECT COUNT(*) FROM vocabulary_meanings;
+SELECT COUNT(*) FROM vocabulary_examples;
+SELECT p."jlptLevel", p."reviewStatus", COUNT(DISTINCT p.id) AS points,
+       COUNT(e.id) AS examples
+FROM grammar_points p
+LEFT JOIN grammar_examples e ON e."grammarPointId" = p.id
+GROUP BY 1, 2
+ORDER BY 1, 2;
+```
+
+A primeira carga em base vazia reporta `inserted` de 8.000 e 286. Uma segunda carga sobre o mesmo catálogo reporta `inserted` igual a zero e `preserved` de 8.000 e 286. O catálogo de Gramática começa com 286 pontos `VALIDATED` e zero `PUBLISHED`. Os estados originais constam do manifesto.
+
+### Publicar apenas os pontos aprovados
+
+O snapshot preserva explicações curtas da origem e exemplos como encontrados. Nos níveis N1 a N4, 1.100 exemplos trazem o próprio japonês no campo de tradução. Use a lista de revisão editorial para confirmar as traduções, leituras e correspondência dos exemplos com os padrões antes de aprovar cada ponto.
+
+1. Com uma sessão de Admin, use `GET /admin/grammar-points?status=VALIDATED` para localizar pontos e `GET /admin/grammar-points/{id}` para inspecionar os detalhes. Use o ID do registro no **destino**.
+2. Depois da revisão, envie `PATCH /admin/grammar-points/{id}/status` com o corpo `{"reviewStatus":"REVIEWED"}`. Para cada ponto aprovado para o público, envie o mesmo PATCH com `{"reviewStatus":"PUBLISHED"}`. A API exige uma sessão Admin. Em chamadas de automação, use o cabeçalho `Authorization: Bearer $ADMIN_ACCESS_TOKEN` e `Content-Type: application/json`.
+3. Confira `GET /grammar/{id}` e `GET /grammar` como visitante. O detalhe deve abrir após a publicação e a listagem só deve contar os pontos `PUBLISHED`.
+
+## Kanji e primeira conta administrativa
 
 1. `npm run db:seed` carrega Kanji pelo `kanjidic2-json` fixado no lockfile. Controle esperado de 13.108 registros e 24.348 significados. O seed recria os significados. Qualquer atualização de uma base existente exige aceite separado e cópia restaurável.
-2. `npm run db:seed:grammar -- --release` lê os 40 pontos N5 versionados. Confira IDs de origem, exemplos e estado `VALIDATED`. Só publique pela API de Admin após aceite editorial. A nova carga preserva estados existentes.
-3. Confira o arquivo compactado e o JSON pelos SHA-256 do [manifesto JMdict](../prisma/seed/vocabulary/jmdict-release.json). Extraia o JSON para `prisma/seed/vocabulary/raw` e execute `npm run db:seed:vocabulary -- --release`. O seed valida o JSON antes do acesso ao banco. A edição inglesa indicada fornece 8.000 vocábulos e 56.993 significados, sem exemplos nem JLPT nos registros selecionados. Confira fonte, atribuição e distribuição conforme a [documentação de dados](vocabulary-data.md).
-4. Para a primeira conta Admin, cadastre o operador pela interface de homologação do destino aprovado, com senha própria. Com a identidade confirmada, o DBA localiza a conta por ID e promove exatamente uma conta ativa de `STUDENT` a `ADMIN` em transação controlada na tabela `users`. Confirme o ID e o papel antes de confirmar a transação. Encerre a sessão anterior, faça novo login e verifique a rota Admin. Não inclua senha padrão ou contas de QA em seeds da produção.
+2. Para a primeira conta Admin, cadastre o operador pela interface de homologação do destino aprovado, com senha própria. Com a identidade confirmada, o DBA localiza a conta por ID e promove exatamente uma conta ativa de `STUDENT` a `ADMIN` em transação controlada na tabela `users`. Confirme o ID e o papel antes de confirmar a transação. Encerre a sessão anterior, faça novo login e verifique a rota Admin. Os seeds de produção devem conter apenas dados de catálogo.
 
 O pipeline offline de tradução, quando utilizado, precisa de Python e do modelo OPUS-MT com `GRAMMAR_TRANSLATION_PYTHON`, `GRAMMAR_LOCAL_TRANSLATION_MODEL_DIR` e `GRAMMAR_LOCAL_TRANSLATION_THREADS` conforme o ambiente. O build e o runtime de tráfego não dependem dessa tarefa. Use um executor administrativo quando o trabalho precisar de arquivos locais persistentes.
 

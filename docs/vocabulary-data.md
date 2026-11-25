@@ -1,6 +1,6 @@
 # Vocabulary Data — Fontes, Licenças e Processo de Importação
 
-Data da última importação: 2026-08-10
+O [snapshot 1.0.0](../seed/catalogs/v1/manifest.json) contém 8.000 pares de palavra e leitura e 56.958 significados do catálogo local. Consulte o [guia de produção](production.md#carga-dos-catálogos-e-publicação-editorial) para exportar, validar e carregar os arquivos versionados.
 
 ## 1. Fontes Utilizadas
 
@@ -80,11 +80,9 @@ Data da última importação: 2026-08-10
      - Primeiro meaning = isPrimary: true, position 0
      - Todos os campos são nullable onde schema permite
                    ▼
-  prisma/seed-vocabulary.ts  (SCRIPT EXECUTÁVEL — ts-node)
-     - Carrega pipeline, checa existentes por (word, reading) unique key
-     - Chunks de 200 em transação
-     - upsert() para cada vocabulário (idempotente)
-     - createMany() skipDuplicates para meanings + examples
+  npm run db:seed:vocabulary -- --raw-jmdict  (modo legado de desenvolvimento)
+     - Carrega o pipeline e verifica pares existentes de palavra e leitura
+     - Insere novos vocábulos, significados e exemplos em lotes
                    ▼
   PostgreSQL via Prisma
      ├─ vocabulary            (unique [word, reading])
@@ -92,48 +90,16 @@ Data da última importação: 2026-08-10
      └─ vocabulary_examples   (atualmente vazio, 0 linhas)
 ```
 
-### 2.2 Como executar a importação
+### 2.2 Carregar o catálogo versionado
 
-**Pré-requisito** — Baixar o JSON do JMdict simplificado:
+Com o Prisma Client gerado e a conexão de destino em `DATABASE_URL`, execute a partir da raiz do backend.
 
-```
-# 1. Acessar https://github.com/scriptin/jmdict-simplified/releases
-# 2. Baixar asset: jmdict-simplified-eng.json (apenas inglês) ou jmdict-simplified.json
-# 3. Mover para:
-backend/prisma/seed/vocabulary/raw/jmdict-simplified.json
-```
-
-**Rodar a importação** (dentro do diretório `backend/`):
-
-```bash
-cd backend/
-
-# Gera o Prisma Client, caso haja alterações de schema
-npx prisma generate
-
-# Importação completa (8.000 palavras)
+```sh
+npm run db:catalogs:validate
 npm run db:seed:vocabulary
-
-# Ou diretamente:
-ts-node prisma/seed-vocabulary.ts
 ```
 
-**Idempotência**: Execute o comando QUANTAS VEZES quiser. Palavras já presentes na tabela `vocabulary` (unique `[word, reading]`) são **puladas (skip)** — NENHUMA linha é apagada e NENHUM dado de usuário (progress SRS, listas customizadas) é tocado. A segunda execução vai reportar `Inserted: 0, Already existed: 8000`.
-
-### 2.3 Como reimportar / atualizar o dataset
-
-Quando uma nova release do `jmdict-simplified` for lançada:
-
-1. **Faça backup do banco** (`pg_dump`) — sempre.
-2. Substitua `prisma/seed/vocabulary/raw/jmdict-simplified.json` pelo novo arquivo.
-3. Rode `npm run db:seed:vocabulary`.
-4. O seed adicionará APENAS combinações novas de (word + reading). Registros antigos permanecem intocados.
-
-Para reimportar tudo do zero (apagar e recriar):
-
-⚠️ **NÃO** faça isso em produção sem backup e sem confirmar que não há dados de usuário com FKs.
-
-Se quiser realmente resetar apenas o conteúdo importado pelo seed (e não dados administrativos/usuário criados manualmente), **não é trivial** porque não existe uma coluna `source` distinguindo entradas seed de entradas manuais. Futuramente podemos adicionar campo `source` se necessário. Por enquanto, para QA/dev local, use um DB separado ou truncate em cascata.
+O seed valida o manifesto e carrega os registros de `seed/catalogs/v1/` em uma transação. A carga preserva registros existentes pelo ID ou pelo par palavra/leitura. JMdict bruto é uma entrada do pipeline de desenvolvimento. Use `npm run db:seed:vocabulary -- --raw-jmdict` para esse fluxo, com um arquivo listado nas instruções de `prisma/seed/vocabulary/raw/`.
 
 ## 3. Limitações Atuais e Riscos Conhecidos
 
@@ -175,7 +141,7 @@ SELECT COUNT(*) AS meanings_rows   FROM vocabulary_meanings;
 SELECT COUNT(*) AS examples_rows   FROM vocabulary_examples;
 
 -- Distribuição JLPT:
-SELECT jlpt_level, COUNT(*)
+SELECT "jlptLevel", COUNT(*)
   FROM vocabulary
  GROUP BY 1
  ORDER BY 1;
@@ -190,13 +156,13 @@ SELECT word, reading, frequency
 -- Palavras sem nenhum meaning (dado corrompido):
 SELECT v.id, v.word, v.reading
   FROM vocabulary v
-  LEFT JOIN vocabulary_meanings vm ON vm.vocabulary_id = v.id
+  LEFT JOIN vocabulary_meanings vm ON vm."vocabularyId" = v.id
  WHERE vm.id IS NULL;
 
 -- Verificar 食べる (auditoria manual de qualidade):
-SELECT v.word, v.reading, v.jlpt_level, v.part_of_speech,
-       (SELECT COUNT(*) FROM vocabulary_meanings vm WHERE vm.vocabulary_id = v.id) AS meanings,
-       (SELECT COUNT(*) FROM vocabulary_examples ve WHERE ve.vocabulary_id = v.id) AS examples
+SELECT v.word, v.reading, v."jlptLevel", v."partOfSpeech",
+       (SELECT COUNT(*) FROM vocabulary_meanings vm WHERE vm."vocabularyId" = v.id) AS meanings,
+       (SELECT COUNT(*) FROM vocabulary_examples ve WHERE ve."vocabularyId" = v.id) AS examples
   FROM vocabulary v
  WHERE v.word = '食べる' AND v.reading = 'たべる';
 ```
