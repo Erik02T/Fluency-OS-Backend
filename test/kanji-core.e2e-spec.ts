@@ -185,11 +185,12 @@ describe('Kanji Core E2E', () => {
       .expect(201);
 
     assertEntityWithId(response.body);
+    createdKanjiId = response.body.id;
     expect(response.body).toHaveProperty('id');
     expect(response.body).toHaveProperty('character', testCharacter);
     expect(response.body).toHaveProperty('jlpt', 'N2');
-
-    createdKanjiId = response.body.id;
+    expect(response.body).toHaveProperty('notes', 'Kanji de teste E2E');
+    expect(response.body).toHaveProperty('romanization', 'e2e');
   });
 
   it('busca kanji por query e por filtro', async () => {
@@ -331,17 +332,71 @@ describe('Kanji Core E2E', () => {
   });
 
   it('edita kanji via rota admin (ADMIN)', async () => {
+    const notes = '  Kanji de teste E2E atualizado: 日本  ';
     const response = await request(app.getHttpServer())
       .put(`/admin/kanjis/${createdKanjiId}`)
       .set('Authorization', `Bearer ${adminAccessToken}`)
       .send({
-        notes: 'Kanji de teste E2E atualizado',
+        notes,
         grade: 7,
+        readings: [
+          { reading: 'コウ', type: 'ONYOMI', romanji: 'kou' },
+          {
+            reading: 'ショウ',
+            type: 'ONYOMI',
+            romanji: 'shou',
+            isPrimary: true,
+          },
+          {
+            reading: 'あき',
+            type: 'NANORI',
+            romanji: 'aki',
+            isPrimary: true,
+          },
+        ],
       })
       .expect(200);
 
     expect(response.body).toHaveProperty('id', createdKanjiId);
     expect(response.body).toHaveProperty('grade', 7);
+    expect(response.body).toHaveProperty('notes', notes);
+    expect(response.body).toHaveProperty('romanization', 'e2e');
+
+    const stored = await prisma.kanji.findUniqueOrThrow({
+      where: { id: createdKanjiId },
+      select: { notes: true, romanization: true },
+    });
+    expect(stored).toEqual({ notes, romanization: 'e2e' });
+
+    const reopened = await request(app.getHttpServer())
+      .get(`/admin/kanjis/${createdKanjiId}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(reopened.body).toEqual(response.body);
+    expect(reopened.body).toHaveProperty('readings.onyomi', [
+      { reading: 'コウ', romanization: 'kou', isCommon: false },
+      { reading: 'ショウ', romanization: 'shou', isCommon: true },
+    ]);
+    expect(reopened.body).toHaveProperty('readings.nanori', [
+      { reading: 'あき', romanization: 'aki', isCommon: true },
+    ]);
+
+    const publicDetail = await request(app.getHttpServer())
+      .get(`/kanji/${createdKanjiId}`)
+      .expect(200);
+
+    expect(publicDetail.body).not.toHaveProperty('notes');
+    expect(publicDetail.body).not.toHaveProperty('romanization');
+  });
+
+  it('restringe o detalhe de edição a administradores', async () => {
+    const path = `/admin/kanjis/${createdKanjiId}`;
+    await request(app.getHttpServer()).get(path).expect(401);
+    await request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', `Bearer ${studentAccessToken}`)
+      .expect(403);
   });
 
   it('retorna 400 para payload admin inválido', async () => {

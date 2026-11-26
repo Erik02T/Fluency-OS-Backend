@@ -29,7 +29,7 @@ import {
   UpdateKanjiDto,
   KanjiFiltersDto,
   PaginatedKanjiResponseDto,
-  KanjiDetailResponseDto,
+  AdminKanjiDetailResponseDto,
 } from './dto';
 import { logStructured } from '../../common/logging/structured-log';
 
@@ -69,15 +69,24 @@ export class AdminKanjiController {
     return this.kanjiService.findAll(filters);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar detalhe administrativo do kanji' })
+  @ApiResponse({ status: 200, type: AdminKanjiDetailResponseDto })
+  findById(@Param('id') id: string): Promise<AdminKanjiDetailResponseDto> {
+    return this.kanjiService.findAdminById(id);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Criar kanji' })
   @ApiResponse({
     status: 201,
     description: 'Kanji criado com sucesso',
-    type: KanjiDetailResponseDto,
+    type: AdminKanjiDetailResponseDto,
   })
-  async create(@Body() dto: CreateKanjiDto): Promise<KanjiDetailResponseDto> {
+  async create(
+    @Body() dto: CreateKanjiDto,
+  ): Promise<AdminKanjiDetailResponseDto> {
     logStructured(
       'info',
       'AdminKanjiController',
@@ -96,12 +105,12 @@ export class AdminKanjiController {
   @ApiResponse({
     status: 200,
     description: 'Kanji atualizado com sucesso',
-    type: KanjiDetailResponseDto,
+    type: AdminKanjiDetailResponseDto,
   })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateKanjiDto,
-  ): Promise<KanjiDetailResponseDto> {
+  ): Promise<AdminKanjiDetailResponseDto> {
     logStructured(
       'info',
       'AdminKanjiController',

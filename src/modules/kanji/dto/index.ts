@@ -12,6 +12,7 @@ export {
   KanjiListResponseDto,
   PaginatedKanjiResponseDto,
   KanjiDetailResponseDto,
+  AdminKanjiDetailResponseDto,
 } from './kanji-response.dto';
 export {
   UpdateKanjiProgressDto,
