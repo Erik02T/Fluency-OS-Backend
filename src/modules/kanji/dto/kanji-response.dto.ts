@@ -138,3 +138,19 @@ export class KanjiDetailResponseDto extends KanjiSummaryDto {
   @ApiPropertyOptional({ type: KanjiDetailProgressDto })
   userProgress?: KanjiDetailProgressDto;
 }
+
+class AdminKanjiReadingsDto extends KanjiReadingsDto {
+  @ApiPropertyOptional({ type: [KanjiCommonReadingDto] })
+  declare nanori?: KanjiCommonReadingDto[];
+}
+
+export class AdminKanjiDetailResponseDto extends KanjiDetailResponseDto {
+  @ApiProperty({ type: String, nullable: true })
+  notes!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  romanization!: string | null;
+
+  @ApiProperty({ type: AdminKanjiReadingsDto })
+  declare readings: AdminKanjiReadingsDto;
+}

@@ -6,6 +6,7 @@ import {
 import { Prisma, ReadingType } from '@prisma/client';
 import { KanjiRepository, UserKanjiProgressRepository } from './repositories';
 import {
+  AdminKanjiDetailResponseDto,
   CreateKanjiDto,
   KanjiFiltersDto,
   KanjiListResponseDto,
@@ -83,11 +84,7 @@ export class KanjiService {
       userId,
     });
 
-    const kanji = await this.kanjiRepository.findByIdFull(id);
-
-    if (!kanji) {
-      throw new NotFoundException(`Kanji with id ${id} not found`);
-    }
+    const kanji = await this.findDetailEntity(id);
 
     let progress: UserKanjiProgressEntity | null = null;
     if (userId) {
@@ -158,7 +155,13 @@ export class KanjiService {
     return kanjis.map((kanji) => this.toListDto(kanji, progressMap));
   }
 
-  async createAdminKanji(dto: CreateKanjiDto): Promise<KanjiDetailResponseDto> {
+  async findAdminById(id: string): Promise<AdminKanjiDetailResponseDto> {
+    return this.toAdminDetailDto(await this.findDetailEntity(id));
+  }
+
+  async createAdminKanji(
+    dto: CreateKanjiDto,
+  ): Promise<AdminKanjiDetailResponseDto> {
     logStructured('info', 'KanjiService', 'kanji.admin.create.start', {
       character: dto.character,
       jlptLevel: dto.jlptLevel,
@@ -179,13 +182,13 @@ export class KanjiService {
       character: kanji.character,
     });
 
-    return this.toDetailDto(kanji);
+    return this.toAdminDetailDto(kanji);
   }
 
   async updateAdminKanji(
     id: string,
     dto: UpdateKanjiDto,
-  ): Promise<KanjiDetailResponseDto> {
+  ): Promise<AdminKanjiDetailResponseDto> {
     logStructured('info', 'KanjiService', 'kanji.admin.update.start', {
       kanjiId: id,
       payloadKeys: Object.keys(dto),
@@ -212,7 +215,7 @@ export class KanjiService {
       character: kanji.character,
     });
 
-    return this.toDetailDto(kanji);
+    return this.toAdminDetailDto(kanji);
   }
 
   async deleteAdminKanji(id: string): Promise<void> {
@@ -367,6 +370,37 @@ export class KanjiService {
             isSuspended: progress.isSuspended,
           }
         : undefined,
+    };
+  }
+
+  private async findDetailEntity(id: string): Promise<KanjiDetailEntity> {
+    const kanji = await this.kanjiRepository.findByIdFull(id);
+    if (!kanji) {
+      throw new NotFoundException(`Kanji with id ${id} not found`);
+    }
+    return kanji;
+  }
+
+  private toAdminDetailDto(
+    kanji: KanjiDetailEntity,
+  ): AdminKanjiDetailResponseDto {
+    const detail = this.toDetailDto(kanji);
+    const nanori = kanji.readings
+      .filter((reading) => reading.type === ReadingType.NANORI)
+      .map((reading) => ({
+        reading: reading.reading,
+        romanization: reading.romanji ?? '',
+        isCommon: reading.isPrimary,
+      }));
+
+    return {
+      ...detail,
+      notes: kanji.notes,
+      romanization: kanji.romanization,
+      readings: {
+        ...detail.readings,
+        nanori: nanori.length > 0 ? nanori : undefined,
+      },
     };
   }
 
